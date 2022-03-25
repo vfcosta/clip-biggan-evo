@@ -1,15 +1,19 @@
-import json
 import os
-
-import biggan
-
-os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+os.environ["KMP_DUPLICATE_LIB_OK"]="TRUE"
 import numpy as np
-from deap import base, cma, creator, tools
+from deap import algorithms
+from deap import base
+from deap import benchmarks
+from deap import cma
+from deap import creator
+from deap import tools
 import torch
 import extra_tools
 import argparse
 from datetime import datetime
+
+
+import matplotlib.pyplot as plt
 
 import big_sleep_cma_es
 
@@ -23,24 +27,19 @@ COUNT_GENERATION = 0
 RANDOM_SEED = 64
 SAVE_ALL = False
 LAMARCK = False
-LOCAL_SEARCH_STEPS = 0
-SIGMA = 0.2
-TEXT = "a painting of superman by van gogh"
-
 
 def clip_fitness(individual):
     # global COUNT_IND, COUNT_GENERATION
     ind_array = np.array(individual)
-    conditional_vector = big_sleep_cma_es.CondVectorParameters(ind_array, batch_size=BATCH_SIZE)
-    result = big_sleep_cma_es.evaluate_with_local_search(conditional_vector, LOCAL_SEARCH_STEPS)
+    conditional_vector = big_sleep_cma_es.CondVectorParameters(ind_array, batch_size=BATCH_SIZE) #
+    result = big_sleep_cma_es.evaluate_with_local_search(conditional_vector,0) # o 0 e o numero de passos do adam na local search
     #big_sleep.checkin_with_cond_vectors(result, conditional_vector, individual=COUNT_IND, itt=COUNT_GENERATION)
     # COUNT_IND += 1
     #print("Lamack", LAMARCK)
-    if LAMARCK:
-        individual[:] = conditional_vector().cpu().detach().numpy().flatten()
+    if LAMARCK: 
+        individual[ : ] = conditional_vector().cpu().detach().numpy().flatten()
     return float(result[2].float().cpu()) * -1,
     #return (float(result[0].float().cpu()) * -1) / 10000+ (float(result[1].float().cpu()) * -1)/10000  + (float(result[2].float().cpu()) * -1)*1,
-
 
 creator.create("FitnessMax", base.Fitness, weights=(1.0,))
 creator.create("Individual", np.ndarray, fitness=creator.FitnessMax)
@@ -48,35 +47,32 @@ creator.create("Individual", np.ndarray, fitness=creator.FitnessMax)
 toolbox = base.Toolbox()
 toolbox.register("evaluate", clip_fitness)
 
-
 def generate_individual_with_embeddings():
     latent = torch.nn.Parameter(torch.zeros(BATCH_SIZE, 128).normal_(std=1).float().cuda())
     params_other = torch.zeros(BATCH_SIZE, 1000).normal_(-3.9, .3).cuda()
     classes = torch.sigmoid(torch.nn.Parameter(params_other))
-    embed = biggan.model.embeddings(classes)
+    embed = big_sleep_cma_es.model.embeddings(classes)
     cond_vector = torch.cat((latent, embed), dim=1)
     ind = cond_vector.cpu().detach().numpy().flatten()
     # cond_vector = big_sleep_cma_es.CondVectorParameters(ind, batch_size=BATCH_SIZE)
     # big_sleep_cma_es.save_individual_cond_vector(cond_vector, f"PONTO_INICIAL.png")
     return ind
 
-
 def main(verbose=True):
     # The cma module uses the np random number generator
     
     parser = argparse.ArgumentParser(description="evolve to objective")
-    global COUNT_IND, COUNT_GENERATION, RANDOM_SEED, N_GENS, POP_SIZE, SAVE_ALL, LAMARCK, LOCAL_SEARCH_STEPS, SIGMA, TEXT
+    global COUNT_IND, COUNT_GENERATION, RANDOM_SEED, N_GENS, POP_SIZE, SAVE_ALL, LAMARCK
 
     parser.add_argument('--random-seed', default=RANDOM_SEED, type=int, help='Use a specific random seed (for repeatability). Default is {}.'.format(RANDOM_SEED))
 
+    experiment_name = f"{big_sleep_cma_es.frase}_clip_cond_vector_{RANDOM_SEED if RANDOM_SEED else datetime.now().strftime('%Y-%m-%d_%H-%M')}"
     parser.add_argument('--save-folder', default="experiments", help="Directory to experiment outputs. Default is 'experiments'.")
+    sub_folder = f"{experiment_name}_{N_GENS}_{POP_SIZE}"
     parser.add_argument('--max-gens', default=N_GENS, type=int, help='Maximum generations. Default is {}.'.format(N_GENS))
     parser.add_argument('--pop-size', default=POP_SIZE, type=int, help='Population size. Default is {}.'.format(POP_SIZE))
-    parser.add_argument('--local-search-steps', default=LOCAL_SEARCH_STEPS, type=int, help='Local search steps. Default is {}.'.format(LOCAL_SEARCH_STEPS))
-    parser.add_argument('--sigma', default=SIGMA, type=float, help='Sigma for cma-es. Default is {}.'.format(SIGMA))
     parser.add_argument('--save-all', default=SAVE_ALL, action='store_true', help='Save all Individual images. Default is {}.'.format(SAVE_ALL))
     parser.add_argument('--lamarck', default=LAMARCK, action='store_true', help='Lamarckian evolution'.format(SAVE_ALL))
-    parser.add_argument('--text', default=TEXT, type=str, help='Text for image generation. Default is {}.'.format(TEXT))
     args = parser.parse_args()
     save_folder = args.save_folder
     POP_SIZE = int(args.pop_size)
@@ -84,17 +80,9 @@ def main(verbose=True):
     RANDOM_SEED = args.random_seed
     SAVE_ALL = args.save_all
     LAMARCK = args.lamarck
-    LOCAL_SEARCH_STEPS = args.local_search_steps
-    SIGMA = args.sigma
-    TEXT = args.text
-    print("params", args)
-    experiment_name = f"{TEXT.replace(' ', '_')}_clip_cond_vector_{RANDOM_SEED or datetime.now().strftime('%Y-%m-%d_%H-%M')}"
-    sub_folder = f"{experiment_name}_{N_GENS}_{POP_SIZE}_{SIGMA}_{LOCAL_SEARCH_STEPS}"
+
     np.random.seed(RANDOM_SEED)
-    big_sleep_cma_es.init(TEXT)
     save_folder, sub_folder = extra_tools.create_save_folder(save_folder, sub_folder)
-    with open(os.path.join(save_folder, sub_folder, "params.json"), "w") as f:
-        json.dump(vars(args), f)
 
     # The CMA-ES algorithm takes a population of one individual as argument
     # The centroid is set to a vector of 5.0 see http://www.lri.fr/~hansen/cmaes_inmatlab.html
@@ -124,13 +112,11 @@ def main(verbose=True):
         fitnesses = toolbox.map(toolbox.evaluate, population)
         for ind, fit in zip(population, fitnesses):
             ind.fitness.values = fit
-
+        
         if SAVE_ALL:
-            gen_folder = os.path.join(save_folder, sub_folder, str(gen))
-            os.makedirs(gen_folder, exist_ok=True)
             for index, ind in enumerate(population):
                 cond_vector = big_sleep_cma_es.CondVectorParameters(np.array(ind), batch_size=BATCH_SIZE)
-                big_sleep_cma_es.save_individual_cond_vector(cond_vector, f"{gen_folder}/{index}.png")
+                big_sleep_cma_es.save_individual_cond_vector(cond_vector, f"{save_folder}/{sub_folder}/{experiment_name}_{gen}_{index}.png")
 
         # Update the strategy with the evaluated individuals
         toolbox.update(population)
@@ -145,9 +131,9 @@ def main(verbose=True):
             print(logbook.stream)
 
         if halloffame is not None:
-            extra_tools.save_gen_best(save_folder, sub_folder, "experiment", [gen, halloffame[0], halloffame[0].fitness.values, "_"])
+            extra_tools.save_gen_best(save_folder, sub_folder, experiment_name, [gen, halloffame[0], halloffame[0].fitness.values, "_"])
             cond_vector = big_sleep_cma_es.CondVectorParameters(np.array(halloffame[0]), batch_size=BATCH_SIZE)
-            big_sleep_cma_es.save_individual_cond_vector(cond_vector, f"{save_folder}/{sub_folder}/{gen}_best.png")
+            big_sleep_cma_es.save_individual_cond_vector(cond_vector, f"{save_folder}/{sub_folder}/{experiment_name}_{gen}_best.png")
 
 
 if __name__ == "__main__":
