@@ -36,6 +36,7 @@ sideX, sideY, channels = im_shape
 nom = torchvision.transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))
 text_features = None
 frase = None
+cuts = None
 
 CUDA_AVAILABLE = torch.cuda.is_available()
 print("CUDA", CUDA_AVAILABLE)
@@ -47,11 +48,18 @@ else:
     model = model.eval()
 
 
-def init(text):
-    global text_features, frase
+def init(text, cutn=128):
+    global text_features, frase, cuts
     frase = text
     tx = clip.tokenize(text)
     text_features = perceptor.encode_text(tx.to(DEVICE)).detach().clone()  # 1 x 512
+
+    cuts = []
+    for ch in range(cutn):
+        size = int(sideX * torch.zeros(1, ).normal_(mean=.8, std=.3).clip(.5, .95))
+        offsetx = torch.randint(0, sideX - size, ())
+        offsety = torch.randint(0, sideX - size, ())
+        cuts.append((offsetx, offsety, size))
 
 
 def displ(img, it=0, pre_scaled=True, individual=0):
@@ -168,12 +176,13 @@ def evaluate(cond_vector_params):
     # classes.data[1:, :] = classes.data[0]
     out = model(cond_vector, 1)  # 1 x 3 x 512 x 512
 
-    cutn = 128
     p_s = []
-    for ch in range(cutn):
-        size = int(sideX * torch.zeros(1, ).normal_(mean=.8, std=.3).clip(.5, .95))
-        offsetx = torch.randint(0, sideX - size, ())
-        offsety = torch.randint(0, sideX - size, ())
+    # cutn = 128
+    # for ch in range(cutn):
+    #     size = int(sideX * torch.zeros(1, ).normal_(mean=.8, std=.3).clip(.5, .95))
+    #     offsetx = torch.randint(0, sideX - size, ())
+    #     offsety = torch.randint(0, sideX - size, ())
+    for offsetx, offsety, size in cuts:
         apper = out[:, :, offsetx:offsetx + size, offsety:offsety + size]
         apper = torch.nn.functional.interpolate(apper, (224, 224), mode='nearest')
         p_s.append(apper)
