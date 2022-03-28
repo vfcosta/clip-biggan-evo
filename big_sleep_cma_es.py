@@ -83,10 +83,9 @@ Choose a place to start in BigGAN (it'll be a dog. Probably a hound lol)
 
 
 class CondVectorParameters(torch.nn.Module):
-    def __init__(self, ind_numpy, batch_size=16):
+    def __init__(self, ind_numpy, num_latents=15):
         super(CondVectorParameters, self).__init__()
-        # aqui FALTA COLOCAR COM CUDA        
-        reshape_array = ind_numpy.reshape(batch_size, 256)
+        reshape_array = ind_numpy.reshape(num_latents, -1)
         self.normu = torch.nn.Parameter(torch.tensor(reshape_array).float().to(DEVICE))
         self.thrsh_lat = torch.tensor(1).to(DEVICE)
         self.thrsh_cls = torch.tensor(1.9).to(DEVICE)

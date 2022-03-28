@@ -14,9 +14,11 @@ import big_sleep_cma_es
 # Problem size
 N_GENS = 125
 POP_SIZE = 10
-BATCH_SIZE = 15  # na verdade é o número de vetores latentes (z => layers_biggan + 1)  https://github.com/lucidrains/big-sleep/issues/34
+NUM_LATENTS = 15  # na verdade é o número de vetores latentes (z => layers_biggan + 1)  https://github.com/lucidrains/big-sleep/issues/34
 IMAGE_SIZE = 512
-GENOTYPE_SIZE = BATCH_SIZE * 256
+Z_DIM = 128
+CLASS_EMBEDDINGS = 128
+GENOTYPE_SIZE = NUM_LATENTS * (Z_DIM + CLASS_EMBEDDINGS)
 COUNT_IND = 0
 COUNT_GENERATION = 0
 RANDOM_SEED = 64
@@ -30,15 +32,13 @@ TEXT = "a painting of superman by van gogh"
 def clip_fitness(individual):
     # global COUNT_IND, COUNT_GENERATION
     ind_array = np.array(individual)
-    conditional_vector = big_sleep_cma_es.CondVectorParameters(ind_array, batch_size=BATCH_SIZE)
+    conditional_vector = big_sleep_cma_es.CondVectorParameters(ind_array, num_latents=NUM_LATENTS)
     result = big_sleep_cma_es.evaluate_with_local_search(conditional_vector, LOCAL_SEARCH_STEPS)
     #big_sleep.checkin_with_cond_vectors(result, conditional_vector, individual=COUNT_IND, itt=COUNT_GENERATION)
     # COUNT_IND += 1
-    #print("Lamack", LAMARCK)
     if LAMARCK:
         individual[:] = conditional_vector().cpu().detach().numpy().flatten()
     return float(result[2].float().cpu()) * -1,
-    #return (float(result[0].float().cpu()) * -1) / 10000+ (float(result[1].float().cpu()) * -1)/10000  + (float(result[2].float().cpu()) * -1)*1,
 
 
 creator.create("FitnessMax", base.Fitness, weights=(1.0,))
@@ -49,8 +49,8 @@ toolbox.register("evaluate", clip_fitness)
 
 
 def generate_individual_with_embeddings():
-    latent = torch.nn.Parameter(torch.zeros(BATCH_SIZE, 128).normal_(std=1).float().cuda())
-    params_other = torch.zeros(BATCH_SIZE, 1000).normal_(-3.9, .3).cuda()
+    latent = torch.nn.Parameter(torch.zeros(NUM_LATENTS, 128).normal_(std=1).float().cuda())
+    params_other = torch.zeros(NUM_LATENTS, 1000).normal_(-3.9, .3).cuda()
     classes = torch.sigmoid(torch.nn.Parameter(params_other))
     embed = big_sleep_cma_es.model.embeddings(classes)
     cond_vector = torch.cat((latent, embed), dim=1)
@@ -129,7 +129,7 @@ def main(verbose=True):
             gen_folder = os.path.join(save_folder, sub_folder, str(gen))
             os.makedirs(gen_folder, exist_ok=True)
             for index, ind in enumerate(population):
-                cond_vector = big_sleep_cma_es.CondVectorParameters(np.array(ind), batch_size=BATCH_SIZE)
+                cond_vector = big_sleep_cma_es.CondVectorParameters(np.array(ind), num_latents=NUM_LATENTS)
                 big_sleep_cma_es.save_individual_cond_vector(cond_vector, f"{gen_folder}/{index}.png")
 
         # Update the strategy with the evaluated individuals
@@ -146,7 +146,7 @@ def main(verbose=True):
 
         if halloffame is not None:
             extra_tools.save_gen_best(save_folder, sub_folder, "experiment", [gen, halloffame[0], halloffame[0].fitness.values, "_"])
-            cond_vector = big_sleep_cma_es.CondVectorParameters(np.array(halloffame[0]), batch_size=BATCH_SIZE)
+            cond_vector = big_sleep_cma_es.CondVectorParameters(np.array(halloffame[0]), num_latents=NUM_LATENTS)
             big_sleep_cma_es.save_individual_cond_vector(cond_vector, f"{save_folder}/{sub_folder}/{gen}_best.png")
 
 
