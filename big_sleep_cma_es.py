@@ -34,6 +34,7 @@ text_features = None
 frase = None
 cuts = None
 im_shape = None
+num_cuts = None
 
 CUDA_AVAILABLE = torch.cuda.is_available()
 print("CUDA", CUDA_AVAILABLE)
@@ -43,7 +44,8 @@ model = None
 
 
 def init(text, cutn=128, image_size=512):
-    global text_features, frase, cuts, model, im_shape
+    global text_features, frase, cuts, model, im_shape, num_cuts
+    num_cuts = cutn
     frase = text
     tx = clip.tokenize(text)
     text_features = perceptor.encode_text(tx.to(DEVICE)).detach().clone()  # 1 x 512
@@ -52,13 +54,6 @@ def init(text, cutn=128, image_size=512):
     model = model.cuda().eval() if CUDA_AVAILABLE else model.eval()
 
     im_shape = [image_size, image_size, 3]
-    sideX, sideY, channels = im_shape
-    cuts = []
-    for ch in range(cutn):
-        size = int(sideX * torch.zeros(1, ).normal_(mean=.8, std=.3).clip(.5, .95))
-        offsetx = torch.randint(0, sideX - size, ())
-        offsety = torch.randint(0, sideX - size, ())
-        cuts.append((offsetx, offsety, size))
 
 
 def displ(img, it=0, pre_scaled=True, individual=0):
@@ -175,15 +170,13 @@ def evaluate(cond_vector_params):
     out = model(cond_vector, 1)  # 1 x 3 x 512 x 512
 
     p_s = []
-    # cutn = 128
-    # for ch in range(cutn):
-    #     size = int(sideX * torch.zeros(1, ).normal_(mean=.8, std=.3).clip(.5, .95))
-    #     offsetx = torch.randint(0, sideX - size, ())
-    #     offsety = torch.randint(0, sideX - size, ())
-    for offsetx, offsety, size in cuts:
+    sideX, sideY, channels = im_shape
+    for ch in range(num_cuts):
+        size = int(sideX * torch.zeros(1, ).normal_(mean=.8, std=.3).clip(.5, .95))
+        offsetx = torch.randint(0, sideX - size, ())
+        offsety = torch.randint(0, sideX - size, ())
         apper = out[:, :, offsetx:offsetx + size, offsety:offsety + size]
-        apper = torch.nn.functional.interpolate(apper, (224, 224), mode='nearest')
-        p_s.append(apper)
+        p_s.append(torch.nn.functional.interpolate(apper, (224, 224), mode='nearest'))
     # convert_tensor = torchvision.transforms.ToTensor()
     into = torch.cat(p_s, 0)
 
