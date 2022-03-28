@@ -1,8 +1,6 @@
 import json
 import os
 
-import biggan
-
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 import numpy as np
 from deap import base, cma, creator, tools
@@ -17,6 +15,7 @@ import big_sleep_cma_es
 N_GENS = 125
 POP_SIZE = 10
 BATCH_SIZE = 15  # na verdade é o número de vetores latentes (z => layers_biggan + 1)  https://github.com/lucidrains/big-sleep/issues/34
+IMAGE_SIZE = 512
 GENOTYPE_SIZE = BATCH_SIZE * 256
 COUNT_IND = 0
 COUNT_GENERATION = 0
@@ -53,7 +52,7 @@ def generate_individual_with_embeddings():
     latent = torch.nn.Parameter(torch.zeros(BATCH_SIZE, 128).normal_(std=1).float().cuda())
     params_other = torch.zeros(BATCH_SIZE, 1000).normal_(-3.9, .3).cuda()
     classes = torch.sigmoid(torch.nn.Parameter(params_other))
-    embed = biggan.model.embeddings(classes)
+    embed = big_sleep_cma_es.model.embeddings(classes)
     cond_vector = torch.cat((latent, embed), dim=1)
     ind = cond_vector.cpu().detach().numpy().flatten()
     # cond_vector = big_sleep_cma_es.CondVectorParameters(ind, batch_size=BATCH_SIZE)
@@ -63,9 +62,8 @@ def generate_individual_with_embeddings():
 
 def main(verbose=True):
     # The cma module uses the np random number generator
-    
     parser = argparse.ArgumentParser(description="evolve to objective")
-    global COUNT_IND, COUNT_GENERATION, RANDOM_SEED, N_GENS, POP_SIZE, SAVE_ALL, LAMARCK, LOCAL_SEARCH_STEPS, SIGMA, TEXT
+    global COUNT_IND, COUNT_GENERATION, RANDOM_SEED, N_GENS, POP_SIZE, SAVE_ALL, LAMARCK, LOCAL_SEARCH_STEPS, SIGMA, TEXT, IMAGE_SIZE
 
     parser.add_argument('--random-seed', default=RANDOM_SEED, type=int, help='Use a specific random seed (for repeatability). Default is {}.'.format(RANDOM_SEED))
 
@@ -77,6 +75,7 @@ def main(verbose=True):
     parser.add_argument('--save-all', default=SAVE_ALL, action='store_true', help='Save all Individual images. Default is {}.'.format(SAVE_ALL))
     parser.add_argument('--lamarck', default=LAMARCK, action='store_true', help='Lamarckian evolution'.format(SAVE_ALL))
     parser.add_argument('--text', default=TEXT, type=str, help='Text for image generation. Default is {}.'.format(TEXT))
+    parser.add_argument('--image-size', default=IMAGE_SIZE, type=int, help='Image size. Default is {}.'.format(IMAGE_SIZE))
     args = parser.parse_args()
     save_folder = args.save_folder
     POP_SIZE = int(args.pop_size)
@@ -87,11 +86,12 @@ def main(verbose=True):
     LOCAL_SEARCH_STEPS = args.local_search_steps
     SIGMA = args.sigma
     TEXT = args.text
+    IMAGE_SIZE = args.image_size
     print("params", args)
     experiment_name = f"{TEXT.replace(' ', '_')}_clip_cond_vector_{RANDOM_SEED or datetime.now().strftime('%Y-%m-%d_%H-%M')}"
     sub_folder = f"{experiment_name}_{N_GENS}_{POP_SIZE}_{SIGMA}_{LOCAL_SEARCH_STEPS}"
     np.random.seed(RANDOM_SEED)
-    big_sleep_cma_es.init(TEXT)
+    big_sleep_cma_es.init(TEXT, image_size=IMAGE_SIZE)
     save_folder, sub_folder = extra_tools.create_save_folder(save_folder, sub_folder)
     with open(os.path.join(save_folder, sub_folder, "params.json"), "w") as f:
         json.dump(vars(args), f)

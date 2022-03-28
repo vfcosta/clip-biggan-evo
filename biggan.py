@@ -634,6 +634,3 @@ class BigGAN(nn.Module):
         # input()
         z = self.generator(cond_vector, truncation)
         return z
-
-
-model = BigGAN.from_pretrained('biggan-deep-512')

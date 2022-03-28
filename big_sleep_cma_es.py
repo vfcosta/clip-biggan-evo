@@ -13,7 +13,7 @@ import torch
 import torch.nn.functional as F
 import torchvision
 
-from biggan import model
+from biggan import BigGAN
 
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
@@ -29,31 +29,30 @@ CCOUNT = 0
 Don't bother changing anything but the prompt below if you're not using a different type of BigGAN
 """
 
-im_shape = [512, 512, 3]
-sideX, sideY, channels = im_shape
-
-
 nom = torchvision.transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))
 text_features = None
 frase = None
 cuts = None
+im_shape = None
 
 CUDA_AVAILABLE = torch.cuda.is_available()
 print("CUDA", CUDA_AVAILABLE)
 DEVICE = torch.device('cuda') if CUDA_AVAILABLE else torch.device('cpu')
 
-if CUDA_AVAILABLE:
-    model = model.cuda().eval()
-else:
-    model = model.eval()
+model = None
 
 
-def init(text, cutn=128):
-    global text_features, frase, cuts
+def init(text, cutn=128, image_size=512):
+    global text_features, frase, cuts, model, im_shape
     frase = text
     tx = clip.tokenize(text)
     text_features = perceptor.encode_text(tx.to(DEVICE)).detach().clone()  # 1 x 512
 
+    model = BigGAN.from_pretrained(f'biggan-deep-{image_size}')
+    model = model.cuda().eval() if CUDA_AVAILABLE else model.eval()
+
+    im_shape = [image_size, image_size, 3]
+    sideX, sideY, channels = im_shape
     cuts = []
     for ch in range(cutn):
         size = int(sideX * torch.zeros(1, ).normal_(mean=.8, std=.3).clip(.5, .95))
