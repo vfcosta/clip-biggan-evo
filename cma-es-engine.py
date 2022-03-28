@@ -16,7 +16,7 @@ import big_sleep_cma_es
 # Problem size
 N_GENS = 125
 POP_SIZE = 10
-BATCH_SIZE = 16
+BATCH_SIZE = 15  # na verdade é o número de vetores latentes (z => layers_biggan + 1)  https://github.com/lucidrains/big-sleep/issues/34
 GENOTYPE_SIZE = BATCH_SIZE * 256
 COUNT_IND = 0
 COUNT_GENERATION = 0

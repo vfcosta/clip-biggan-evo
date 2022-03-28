@@ -551,9 +551,11 @@ class Generator(nn.Module):
         z = z.permute(0, 3, 1, 2).contiguous()
         # print("cond vector size", cond_vector.shape)
         # input()
-        for i, layer in enumerate(self.layers):
+        next_available_latent_index = 1
+        for layer in self.layers:
             if isinstance(layer, GenBlock):
-                z = layer(z, cond_vector[i + 1].unsqueeze(0), truncation)
+                z = layer(z, cond_vector[next_available_latent_index].unsqueeze(0), truncation)
+                next_available_latent_index += 1
                 # z = layer(z, cond_vector, truncation)
                 # print(z.shape)
                 # print(cond_vector.shape)
