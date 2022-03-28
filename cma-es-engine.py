@@ -125,7 +125,7 @@ def main(verbose=True):
         for ind, fit in zip(population, fitnesses):
             ind.fitness.values = fit
 
-        if SAVE_ALL:
+        if SAVE_ALL or gen == N_GENS - 1:
             gen_folder = os.path.join(save_folder, sub_folder, str(gen))
             os.makedirs(gen_folder, exist_ok=True)
             for index, ind in enumerate(population):

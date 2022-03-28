@@ -75,66 +75,6 @@ Choose a place to start in BigGAN (it'll be a dog. Probably a hound lol)
 """
 
 
-class Pars(torch.nn.Module):
-    def __init__(self, ind_numpy=None, all_different=False, batch_size=16):
-        super(Pars, self).__init__()
-        # params = torch.zeros(32, 1).normal_(std=1)
-
-        # self.stds = torch.nn.Parameter(params)
-
-        # params = torch.zeros(32, 1).normal_(std=.1)
-        # self.means = torch.nn.Parameter(params)
-
-        # aqui
-        if ind_numpy is None:
-            self.normu = torch.nn.Parameter(torch.zeros(16, 256).normal_(std=1).to(DEVICE))
-            params_other = torch.zeros(16, 1000).normal_(-3.9, .3)
-            self.cls = torch.nn.Parameter(params_other)
-            self.thrsh_lat = torch.tensor(1).to(DEVICE)
-            self.thrsh_cls = torch.tensor(1.9).to(DEVICE)
-        else:
-            #   print(ind_numpy.shape)
-            #   input()
-            if all_different:
-                latent_space_numpy = ind_numpy[: 128 * batch_size].reshape(batch_size, 128)
-                imagenet_classes_numpy = ind_numpy[128 * batch_size:].reshape(batch_size, 1000)
-                self.normu = torch.nn.Parameter(torch.tensor(latent_space_numpy).float().to(DEVICE))
-                self.cls = torch.nn.Parameter(torch.tensor(imagenet_classes_numpy).float().to(DEVICE))
-            else:
-                latent_space_numpy = ind_numpy[: 128]
-                imagenet_classes_numpy = ind_numpy[128:]
-                self.normu = torch.nn.Parameter(torch.tensor(latent_space_numpy).repeat(32, 1).float().to(DEVICE))
-                self.cls = torch.nn.Parameter(torch.tensor(imagenet_classes_numpy).repeat(32, 1).float().to(DEVICE))
-
-            #   print('UMMMM')
-            #   print(latent_space_numpy.shape)
-            #   print('DOISSSS')
-            #   print(imagenet_classes_numpy.shape)
-            #   input()
-            self.thrsh_lat = torch.tensor(1).to(DEVICE)
-            self.thrsh_cls = torch.tensor(1.9).to(DEVICE)
-
-    #  def forward(self):
-    # return self.ff2(self.ff1(self.latent_code)), torch.softmax(1000*self.ff4(self.ff3(self.cls)), -1)
-    #   return self.normu, torch.sigmoid(self.cls)
-
-    def forward(self):
-        global CCOUNT
-        if (CCOUNT < -10):
-            self.normu, self.cls = copiado(self.normu, self.cls)
-        if (MAX_CLASSES > 0):
-            classes = differentiable_topk(self.cls, MAX_CLASSES)
-            return self.normu, classes
-        else:
-            return self.normu  # , torch.sigmoid(self.cls)
-
-
-"""# Latent coordinate
-
-Choose a place to start in BigGAN (it'll be a dog. Probably a hound lol)
-"""
-
-
 class CondVectorParameters(torch.nn.Module):
     def __init__(self, ind_numpy, batch_size=16):
         super(CondVectorParameters, self).__init__()
@@ -246,15 +186,11 @@ def evaluate(cond_vector_params):
 
     iii = perceptor.encode_image(into)  # 128 x 512
 
-    # llls = lats()
-
-    #   lat_l = torch.abs(1 - torch.std(llls[0], dim=1)).mean() + \
-    #   torch.abs(torch.mean(llls[0])).mean() + \
-    #   4*torch.max(torch.square(llls[0]).mean(), lats.thrsh_lat)
-
+    # llls = cond_vector_params()
+    # lat_l = torch.abs(1 - torch.std(llls[0], dim=1)).mean() + torch.abs(torch.mean(llls[0])).mean() + 4 * torch.max(torch.square(llls[0]).mean(), lats.thrsh_lat)
     lat_l = 0
 
-    #   for array in llls[0]:
+    # for array in llls[0]:
     #     mean = torch.mean(array)
     #     diffs = array - mean
     #     var = torch.mean(torch.pow(diffs, 2.0))
@@ -262,12 +198,10 @@ def evaluate(cond_vector_params):
     #     zscores = diffs / std
     #     skews = torch.mean(torch.pow(zscores, 3.0))
     #     kurtoses = torch.mean(torch.pow(zscores, 4.0)) - 3.0
-
     #     lat_l = lat_l + torch.abs(kurtoses) / llls[0].shape[0] + torch.abs(skews) / llls[0].shape[0]
 
-    cls_l = 0
-
     # cls_l = ((50*torch.topk(llls[1],largest=False,dim=1,k=999)[0])**2).mean()
+    cls_l = 0
 
     return [lat_l, cls_l, -100 * torch.cosine_similarity(text_features, iii, dim=-1).mean()]
 
@@ -276,7 +210,7 @@ def evaluate_with_local_search(cond_vector_params, local_search_steps=5):
     local_search_optimizer = torch.optim.Adam(cond_vector_params.parameters(), .07)
     loss1 = evaluate(cond_vector_params)
     for i in range(local_search_steps):
-        loss = loss1[2]
+        loss = loss1[0] + loss1[1] + loss1[2]
         # print('Zerar Grads')
         local_search_optimizer.zero_grad()
         # print('Computar Grads')
