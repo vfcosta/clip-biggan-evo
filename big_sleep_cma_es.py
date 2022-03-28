@@ -215,8 +215,8 @@ def evaluate(cond_vector_params):
     return [lat_l, cls_l, -100 * torch.cosine_similarity(text_features, iii, dim=-1).mean()]
 
 
-def evaluate_with_local_search(cond_vector_params, local_search_steps=5):
-    local_search_optimizer = torch.optim.Adam(cond_vector_params.parameters(), .07)
+def evaluate_with_local_search(cond_vector_params, local_search_steps=5, lr=.07):
+    local_search_optimizer = torch.optim.Adam(cond_vector_params.parameters(), lr) if local_search_steps else None
     loss1 = evaluate(cond_vector_params)
     for i in range(local_search_steps):
         loss = loss1[0] + loss1[1] + loss1[2]
