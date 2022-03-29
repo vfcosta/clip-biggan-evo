@@ -8,17 +8,16 @@ import torch
 import extra_tools
 import argparse
 from datetime import datetime
+import logging
 
 import big_sleep_cma_es
 
 # Problem size
 N_GENS = 125
 POP_SIZE = 10
-NUM_LATENTS = 15  # na verdade é o número de vetores latentes (z => layers_biggan + 1)  https://github.com/lucidrains/big-sleep/issues/34
+NUM_LATENTS = None  # na verdade é o número de vetores latentes (z => layers_biggan + 1)  https://github.com/lucidrains/big-sleep/issues/34
 IMAGE_SIZE = 512
 Z_DIM = 128
-CLASS_EMBEDDINGS = 128
-GENOTYPE_SIZE = NUM_LATENTS * (Z_DIM + CLASS_EMBEDDINGS)
 COUNT_IND = 0
 COUNT_GENERATION = 0
 RANDOM_SEED = 64
@@ -27,6 +26,9 @@ LAMARCK = False
 LOCAL_SEARCH_STEPS = 0
 SIGMA = 0.2
 TEXT = "a painting of superman by van gogh"
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def clip_fitness(individual):
@@ -49,21 +51,24 @@ toolbox.register("evaluate", clip_fitness)
 
 
 def generate_individual_with_embeddings():
-    latent = torch.nn.Parameter(torch.zeros(NUM_LATENTS, 128).normal_(std=1).float().cuda())
+    latent = torch.nn.Parameter(torch.zeros(NUM_LATENTS, Z_DIM).normal_(std=1).float().cuda())
     params_other = torch.zeros(NUM_LATENTS, 1000).normal_(-3.9, .3).cuda()
     classes = torch.sigmoid(torch.nn.Parameter(params_other))
     embed = big_sleep_cma_es.model.embeddings(classes)
     cond_vector = torch.cat((latent, embed), dim=1)
+    logger.info("cond_vector shape: %s", cond_vector.shape)
     ind = cond_vector.cpu().detach().numpy().flatten()
     # cond_vector = big_sleep_cma_es.CondVectorParameters(ind, batch_size=BATCH_SIZE)
     # big_sleep_cma_es.save_individual_cond_vector(cond_vector, f"PONTO_INICIAL.png")
+    logger.info("individual shape: %s", ind.shape)
     return ind
 
 
 def main(verbose=True):
     # The cma module uses the np random number generator
     parser = argparse.ArgumentParser(description="evolve to objective")
-    global COUNT_IND, COUNT_GENERATION, RANDOM_SEED, N_GENS, POP_SIZE, SAVE_ALL, LAMARCK, LOCAL_SEARCH_STEPS, SIGMA, TEXT, IMAGE_SIZE
+    global COUNT_IND, COUNT_GENERATION, RANDOM_SEED, N_GENS, POP_SIZE, SAVE_ALL, LAMARCK, LOCAL_SEARCH_STEPS, SIGMA, \
+        TEXT, IMAGE_SIZE, NUM_LATENTS
 
     parser.add_argument('--random-seed', default=RANDOM_SEED, type=int, help='Use a specific random seed (for repeatability). Default is {}.'.format(RANDOM_SEED))
 
@@ -87,14 +92,16 @@ def main(verbose=True):
     SIGMA = args.sigma
     TEXT = args.text
     IMAGE_SIZE = args.image_size
-    print("params", args)
     experiment_name = f"{TEXT.replace(' ', '_')}_clip_cond_vector_{RANDOM_SEED or datetime.now().strftime('%Y-%m-%d_%H-%M')}"
     sub_folder = f"{experiment_name}_{N_GENS}_{POP_SIZE}_{SIGMA}_{LOCAL_SEARCH_STEPS}"
     np.random.seed(RANDOM_SEED)
-    big_sleep_cma_es.init(TEXT, image_size=IMAGE_SIZE)
+    model = big_sleep_cma_es.init(TEXT, image_size=IMAGE_SIZE)
+    NUM_LATENTS = len(model.config.layers) + 1
     save_folder, sub_folder = extra_tools.create_save_folder(save_folder, sub_folder)
     with open(os.path.join(save_folder, sub_folder, "params.json"), "w") as f:
         json.dump(vars(args), f)
+
+    print("params", args, f"num_latents={NUM_LATENTS}")
 
     # The CMA-ES algorithm takes a population of one individual as argument
     # The centroid is set to a vector of 5.0 see http://www.lri.fr/~hansen/cmaes_inmatlab.html

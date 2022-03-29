@@ -15,7 +15,7 @@ import torchvision
 
 from biggan import BigGAN
 
-logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
+logger = logging.getLogger(__name__)
 
 # Load the model
 perceptor, preprocess = clip.load('ViT-B/32')
@@ -54,6 +54,7 @@ def init(text, cutn=128, image_size=512):
     model = model.cuda().eval() if CUDA_AVAILABLE else model.eval()
 
     im_shape = [image_size, image_size, 3]
+    return model
 
 
 def displ(img, it=0, pre_scaled=True, individual=0):
