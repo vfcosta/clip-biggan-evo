@@ -2,6 +2,8 @@
 """The Big Sleep: BigGANxCLIP.ipynb
 Original file is located at
     https://colab.research.google.com/drive/1NCceX2mbiKOSlAd_o7IU7nA9UskKN5WR
+
+Also available at https://github.com/lucidrains/big-sleep
 """
 
 import logging
@@ -22,7 +24,6 @@ perceptor, preprocess = clip.load('ViT-B/32')
 
 seed = 0
 MAX_CLASSES = 0
-CCOUNT = 0
 
 """# Parameters
 
@@ -35,12 +36,12 @@ frase = None
 cuts = None
 im_shape = None
 num_cuts = None
+model = None
 
 CUDA_AVAILABLE = torch.cuda.is_available()
-print("CUDA", CUDA_AVAILABLE)
+logger.info("CUDA: %s", CUDA_AVAILABLE)
 DEVICE = torch.device('cuda') if CUDA_AVAILABLE else torch.device('cpu')
 
-model = None
 
 
 def init(text, cutn=128, image_size=512):
@@ -55,25 +56,6 @@ def init(text, cutn=128, image_size=512):
 
     im_shape = [image_size, image_size, 3]
     return model
-
-
-def displ(img, it=0, individual=0):
-    global frase
-    global seed
-
-    img = np.array(img)[:, :, :]
-    img = np.transpose(img, (1, 2, 0))
-    imageio.imwrite(frase + "-seed=" + str(seed - 1) + "-it=" + str(it) + "-ind=" + str(individual) + '.png',
-                    np.array(img))
-    # print(frase + "-seed="+str(seed-1)+"-it="+str(0) + '.png')
-    # return display.Image(str(3)+'.png')
-    return 0
-
-
-"""# Latent coordinate
-
-Choose a place to start in BigGAN (it'll be a dog. Probably a hound lol)
-"""
 
 
 class CondVectorParameters(torch.nn.Module):
@@ -101,13 +83,6 @@ class CondVectorParameters(torch.nn.Module):
         return self.normu
 
 
-def copiado(lats, classes):
-    lats = torch.nn.Parameter(torch.tensor(lats[0]).repeat(16, 1).float().to(DEVICE))
-    # aux_c=classes[0]
-    classes = torch.nn.Parameter(torch.tensor(classes[0]).repeat(16, 1).float().to(DEVICE))
-    return lats, classes
-
-
 def differentiable_topk(x, k, temperature=1.):
     n, dim = x.shape
     topk_tensors = []
@@ -124,25 +99,12 @@ def differentiable_topk(x, k, temperature=1.):
     return topks.reshape(n, k, dim).sum(dim=1)
 
 
-eps = 0
-lats = 0
-optimizer = 0
-
-
-def save_individual_cond_vector(cond_vector, file_name):
+def save_individual_image(cond_vector, file_name):
     al = model(cond_vector(), 1).cpu().detach().numpy()
     for img in al:
         img = np.array(img)[:, :, :]
         img = np.transpose(img, (1, 2, 0))
-        imageio.imwrite(file_name, ((np.array(img) + 1)*127.5).astype(np.uint8))
-
-
-def checkin_with_cond_vectors(loss, cond_vector, individual=0, itt=0):
-    best = torch.topk(loss[2], k=1, largest=False)[1]
-    with torch.no_grad():
-        al = model(cond_vector(), 1)[best:best + 1].cpu().numpy()
-    for allls in al:
-        displ(allls, it=itt, individual=individual)
+        imageio.imwrite(file_name, ((img + 1) * 127.5).astype(np.uint8))
 
 
 def evaluate(cond_vector_params):
@@ -196,12 +158,8 @@ def evaluate_with_local_search(cond_vector_params, local_search_steps=5, lr=.07)
     loss1 = evaluate(cond_vector_params)
     for i in range(local_search_steps):
         loss = loss1[0] + loss1[1] + loss1[2]
-        # print('Zerar Grads')
         local_search_optimizer.zero_grad()
-        # print('Computar Grads')
         loss.backward()
-        # print('Aplicar Adam')
         local_search_optimizer.step()
         loss1 = evaluate(cond_vector_params)
-
     return loss1

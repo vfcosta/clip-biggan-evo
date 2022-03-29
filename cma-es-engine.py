@@ -18,7 +18,6 @@ POP_SIZE = 10
 NUM_LATENTS = None  # na verdade é o número de vetores latentes (z => layers_biggan + 1)  https://github.com/lucidrains/big-sleep/issues/34
 IMAGE_SIZE = 512
 Z_DIM = 128
-COUNT_IND = 0
 COUNT_GENERATION = 0
 RANDOM_SEED = 64
 SAVE_ALL = False
@@ -32,12 +31,9 @@ logger = logging.getLogger(__name__)
 
 
 def clip_fitness(individual):
-    # global COUNT_IND, COUNT_GENERATION
     ind_array = np.array(individual)
     conditional_vector = big_sleep_cma_es.CondVectorParameters(ind_array, num_latents=NUM_LATENTS)
     result = big_sleep_cma_es.evaluate_with_local_search(conditional_vector, LOCAL_SEARCH_STEPS)
-    #big_sleep.checkin_with_cond_vectors(result, conditional_vector, individual=COUNT_IND, itt=COUNT_GENERATION)
-    # COUNT_IND += 1
     if LAMARCK:
         individual[:] = conditional_vector().cpu().detach().numpy().flatten()
     return float(result[2].float().cpu()) * -1,
@@ -58,8 +54,6 @@ def generate_individual_with_embeddings():
     cond_vector = torch.cat((latent, embed), dim=1)
     logger.info("cond_vector shape: %s", cond_vector.shape)
     ind = cond_vector.cpu().detach().numpy().flatten()
-    # cond_vector = big_sleep_cma_es.CondVectorParameters(ind, batch_size=BATCH_SIZE)
-    # big_sleep_cma_es.save_individual_cond_vector(cond_vector, f"PONTO_INICIAL.png")
     logger.info("individual shape: %s", ind.shape)
     return ind
 
@@ -67,7 +61,7 @@ def generate_individual_with_embeddings():
 def main(verbose=True):
     # The cma module uses the np random number generator
     parser = argparse.ArgumentParser(description="evolve to objective")
-    global COUNT_IND, COUNT_GENERATION, RANDOM_SEED, N_GENS, POP_SIZE, SAVE_ALL, LAMARCK, LOCAL_SEARCH_STEPS, SIGMA, \
+    global COUNT_GENERATION, RANDOM_SEED, N_GENS, POP_SIZE, SAVE_ALL, LAMARCK, LOCAL_SEARCH_STEPS, SIGMA, \
         TEXT, IMAGE_SIZE, NUM_LATENTS
 
     parser.add_argument('--random-seed', default=RANDOM_SEED, type=int, help='Use a specific random seed (for repeatability). Default is {}.'.format(RANDOM_SEED))
@@ -107,7 +101,7 @@ def main(verbose=True):
     # The centroid is set to a vector of 5.0 see http://www.lri.fr/~hansen/cmaes_inmatlab.html
     # for more details about the rastrigin and other tests for CMA-ES    
     # strategy = cma.Strategy(centroid=np.random.normal(0.5, .5, GENOTYPE_SIZE), sigma=0.5, lambda_=POP_SIZE)
-    strategy = cma.Strategy(centroid=generate_individual_with_embeddings(), sigma=0.2, lambda_=POP_SIZE)
+    strategy = cma.Strategy(centroid=generate_individual_with_embeddings(), sigma=SIGMA, lambda_=POP_SIZE)
     toolbox.register("generate", strategy.generate, creator.Individual)
     toolbox.register("update", strategy.update)
 
@@ -126,7 +120,6 @@ def main(verbose=True):
         # Generate a new population
         population = toolbox.generate()
         # Evaluate the individuals
-        COUNT_IND = 0
         COUNT_GENERATION = gen
         fitnesses = toolbox.map(toolbox.evaluate, population)
         for ind, fit in zip(population, fitnesses):
@@ -137,7 +130,7 @@ def main(verbose=True):
             os.makedirs(gen_folder, exist_ok=True)
             for index, ind in enumerate(population):
                 cond_vector = big_sleep_cma_es.CondVectorParameters(np.array(ind), num_latents=NUM_LATENTS)
-                big_sleep_cma_es.save_individual_cond_vector(cond_vector, f"{gen_folder}/{index}.png")
+                big_sleep_cma_es.save_individual_image(cond_vector, f"{gen_folder}/{index}.png")
 
         # Update the strategy with the evaluated individuals
         toolbox.update(population)
@@ -154,7 +147,7 @@ def main(verbose=True):
         if halloffame is not None:
             extra_tools.save_gen_best(save_folder, sub_folder, "experiment", [gen, halloffame[0], halloffame[0].fitness.values, "_"])
             cond_vector = big_sleep_cma_es.CondVectorParameters(np.array(halloffame[0]), num_latents=NUM_LATENTS)
-            big_sleep_cma_es.save_individual_cond_vector(cond_vector, f"{save_folder}/{sub_folder}/{gen}_best.png")
+            big_sleep_cma_es.save_individual_image(cond_vector, f"{save_folder}/{sub_folder}/{gen}_best.png")
 
 
 if __name__ == "__main__":
