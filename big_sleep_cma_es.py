@@ -57,14 +57,12 @@ def init(text, cutn=128, image_size=512):
     return model
 
 
-def displ(img, it=0, pre_scaled=True, individual=0):
+def displ(img, it=0, individual=0):
     global frase
     global seed
 
     img = np.array(img)[:, :, :]
     img = np.transpose(img, (1, 2, 0))
-    if not pre_scaled:
-        img = scale(img, 48 * 4, 32 * 4)
     imageio.imwrite(frase + "-seed=" + str(seed - 1) + "-it=" + str(it) + "-ind=" + str(individual) + '.png',
                     np.array(img))
     # print(frase + "-seed="+str(seed-1)+"-it="+str(0) + '.png')
@@ -131,26 +129,12 @@ lats = 0
 optimizer = 0
 
 
-def save_individual(latent_space, file_name, pre_scaled=True):
-    # if it == 0: os.mkdir(path_to_folder)
-    al = model(*latent_space(), 1).cpu().detach().numpy()
-    for img in al:
-        img = np.array(img)[:, :, :]
-        img = np.transpose(img, (1, 2, 0))
-        if not pre_scaled:
-            img = scale(img, 48 * 4, 32 * 4)
-        imageio.imwrite(file_name, np.array(img))
-
-
-def save_individual_cond_vector(cond_vector, file_name, pre_scaled=True):
-    # if it == 0: os.mkdir(path_to_folder)
+def save_individual_cond_vector(cond_vector, file_name):
     al = model(cond_vector(), 1).cpu().detach().numpy()
     for img in al:
         img = np.array(img)[:, :, :]
         img = np.transpose(img, (1, 2, 0))
-        if not pre_scaled:
-            img = scale(img, 48 * 4, 32 * 4)
-        imageio.imwrite(file_name, np.array(img))
+        imageio.imwrite(file_name, ((np.array(img) + 1)*127.5).astype(np.uint8))
 
 
 def checkin_with_cond_vectors(loss, cond_vector, individual=0, itt=0):
@@ -221,8 +205,3 @@ def evaluate_with_local_search(cond_vector_params, local_search_steps=5, lr=.07)
         loss1 = evaluate(cond_vector_params)
 
     return loss1
-
-
-def scale(img, *args):
-    logger.warning("not implemented")
-    return scale
