@@ -1,10 +1,10 @@
+import torch
 import json
 import os
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 import numpy as np
 from deap import base, cma, creator, tools
-import torch
 import extra_tools
 import argparse
 from datetime import datetime
@@ -46,9 +46,9 @@ toolbox = base.Toolbox()
 toolbox.register("evaluate", clip_fitness)
 
 
-def generate_individual_with_embeddings():
-    latent = torch.nn.Parameter(torch.zeros(NUM_LATENTS, Z_DIM).normal_(std=1).float().cuda())
-    params_other = torch.zeros(NUM_LATENTS, 1000).normal_(-3.9, .3).cuda()
+def generate_individual_with_embeddings(num_latents, z_dim):
+    latent = torch.nn.Parameter(torch.zeros(num_latents, z_dim).normal_(std=1).float().cuda())
+    params_other = torch.zeros(num_latents, 1000).normal_(-3.9, .3).cuda()
     classes = torch.sigmoid(torch.nn.Parameter(params_other))
     embed = big_sleep_cma_es.model.embeddings(classes)
     cond_vector = torch.cat((latent, embed), dim=1)
@@ -97,11 +97,22 @@ def main(verbose=True):
 
     print("params", args, f"num_latents={NUM_LATENTS}")
 
+    individual = generate_individual_with_embeddings(NUM_LATENTS, Z_DIM)
+
+    if POP_SIZE == 1:
+        logger.info("run non-evolutionary version")
+        cond_vector = big_sleep_cma_es.CondVectorParameters(individual, num_latents=NUM_LATENTS)
+        for gen in range(N_GENS):
+            loss = big_sleep_cma_es.evaluate_with_local_search(cond_vector, LOCAL_SEARCH_STEPS)
+            print(gen, loss)
+            big_sleep_cma_es.save_individual_image(cond_vector, f"{save_folder}/{sub_folder}/{gen}_best.png")
+        return
+
     # The CMA-ES algorithm takes a population of one individual as argument
     # The centroid is set to a vector of 5.0 see http://www.lri.fr/~hansen/cmaes_inmatlab.html
     # for more details about the rastrigin and other tests for CMA-ES    
     # strategy = cma.Strategy(centroid=np.random.normal(0.5, .5, GENOTYPE_SIZE), sigma=0.5, lambda_=POP_SIZE)
-    strategy = cma.Strategy(centroid=generate_individual_with_embeddings(), sigma=SIGMA, lambda_=POP_SIZE)
+    strategy = cma.Strategy(centroid=individual, sigma=SIGMA, lambda_=POP_SIZE)
     toolbox.register("generate", strategy.generate, creator.Individual)
     toolbox.register("update", strategy.update)
 
