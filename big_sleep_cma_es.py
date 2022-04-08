@@ -49,7 +49,6 @@ def init(text, cutn=128, image_size=512):
     frase = text
     tx = clip.tokenize(text)
     text_features = perceptor.encode_text(tx.to(DEVICE)).detach().clone()  # 1 x 512
-    text_features /= text_features.norm(dim=-1, keepdim=True)
 
     model = BigGAN.from_pretrained(f'biggan-deep-{image_size}')
     model = model.cuda().eval() if CUDA_AVAILABLE else model.eval()
@@ -132,7 +131,6 @@ def evaluate(cond_vector_params):
     into = nom(((into) + 1) / 2)
 
     iii = perceptor.encode_image(into)  # 128 x 512
-    iii /= iii.norm(dim=-1, keepdim=True)
 
     # llls = cond_vector_params()
     # lat_l = torch.abs(1 - torch.std(llls[0], dim=1)).mean() + torch.abs(torch.mean(llls[0])).mean() + 4 * torch.max(torch.square(llls[0]).mean(), lats.thrsh_lat)
