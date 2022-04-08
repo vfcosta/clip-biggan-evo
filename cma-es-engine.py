@@ -25,6 +25,7 @@ LAMARCK = False
 LOCAL_SEARCH_STEPS = 0
 SIGMA = 0.2
 NUM_CUTS = 128
+LEARNING_RATE = 0.07
 TEXT = "a painting of superman by van gogh"
 
 logging.basicConfig(level=logging.INFO)
@@ -34,7 +35,7 @@ logger = logging.getLogger(__name__)
 def clip_fitness(individual):
     ind_array = np.array(individual)
     conditional_vector = big_sleep_cma_es.CondVectorParameters(ind_array, num_latents=NUM_LATENTS)
-    result = big_sleep_cma_es.evaluate_with_local_search(conditional_vector, LOCAL_SEARCH_STEPS)
+    result = big_sleep_cma_es.evaluate_with_local_search(conditional_vector, LOCAL_SEARCH_STEPS, lr=LEARNING_RATE)
     if LAMARCK:
         individual[:] = conditional_vector().cpu().detach().numpy().flatten()
     return float(result[2].float().cpu()) * -1,
@@ -63,7 +64,7 @@ def main(verbose=True):
     # The cma module uses the np random number generator
     parser = argparse.ArgumentParser(description="evolve to objective")
     global COUNT_GENERATION, RANDOM_SEED, N_GENS, POP_SIZE, SAVE_ALL, LAMARCK, LOCAL_SEARCH_STEPS, SIGMA, \
-        TEXT, IMAGE_SIZE, NUM_LATENTS, NUM_CUTS
+        TEXT, IMAGE_SIZE, NUM_LATENTS, NUM_CUTS, LEARNING_RATE
 
     parser.add_argument('--random-seed', default=RANDOM_SEED, type=int, help='Use a specific random seed (for repeatability). Default is {}.'.format(RANDOM_SEED))
 
@@ -77,6 +78,7 @@ def main(verbose=True):
     parser.add_argument('--text', default=TEXT, type=str, help='Text for image generation. Default is {}.'.format(TEXT))
     parser.add_argument('--image-size', default=IMAGE_SIZE, type=int, help='Image size. Default is {}.'.format(IMAGE_SIZE))
     parser.add_argument('--num-cuts', default=NUM_CUTS, type=int, help='Number of cutouts. Default is {}.'.format(NUM_CUTS))
+    parser.add_argument('--lr', default=LEARNING_RATE, type=float, help='Learning rate for adam. Default is {}.'.format(LEARNING_RATE))
     args = parser.parse_args()
     save_folder = args.save_folder
     POP_SIZE = int(args.pop_size)
@@ -89,6 +91,7 @@ def main(verbose=True):
     TEXT = args.text
     IMAGE_SIZE = args.image_size
     NUM_CUTS = args.num_cuts
+    LEARNING_RATE = args.lr
     experiment_name = f"{TEXT.replace(' ', '_')}_clip_cond_vector_{RANDOM_SEED or datetime.now().strftime('%Y-%m-%d_%H-%M')}"
     sub_folder = f"{experiment_name}_{N_GENS}_{POP_SIZE}_{SIGMA}_{LOCAL_SEARCH_STEPS}"
     np.random.seed(RANDOM_SEED)
@@ -106,7 +109,7 @@ def main(verbose=True):
         logger.info("run non-evolutionary version")
         cond_vector = big_sleep_cma_es.CondVectorParameters(individual, num_latents=NUM_LATENTS)
         for gen in range(N_GENS):
-            loss = big_sleep_cma_es.evaluate_with_local_search(cond_vector, LOCAL_SEARCH_STEPS)
+            loss = big_sleep_cma_es.evaluate_with_local_search(cond_vector, LOCAL_SEARCH_STEPS, lr=LEARNING_RATE)
             print(gen, loss)
             big_sleep_cma_es.save_individual_image(cond_vector, f"{save_folder}/{sub_folder}/{gen}_best.png")
         return
