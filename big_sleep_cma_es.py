@@ -43,7 +43,6 @@ logger.info("CUDA: %s", CUDA_AVAILABLE)
 DEVICE = torch.device('cuda') if CUDA_AVAILABLE else torch.device('cpu')
 
 
-
 def init(text, cutn=128, image_size=512):
     global text_features, frase, cuts, model, im_shape, num_cuts
     num_cuts = cutn

@@ -24,6 +24,7 @@ SAVE_ALL = False
 LAMARCK = False
 LOCAL_SEARCH_STEPS = 0
 SIGMA = 0.2
+NUM_CUTS = 128
 TEXT = "a painting of superman by van gogh"
 
 logging.basicConfig(level=logging.INFO)
@@ -62,7 +63,7 @@ def main(verbose=True):
     # The cma module uses the np random number generator
     parser = argparse.ArgumentParser(description="evolve to objective")
     global COUNT_GENERATION, RANDOM_SEED, N_GENS, POP_SIZE, SAVE_ALL, LAMARCK, LOCAL_SEARCH_STEPS, SIGMA, \
-        TEXT, IMAGE_SIZE, NUM_LATENTS
+        TEXT, IMAGE_SIZE, NUM_LATENTS, NUM_CUTS
 
     parser.add_argument('--random-seed', default=RANDOM_SEED, type=int, help='Use a specific random seed (for repeatability). Default is {}.'.format(RANDOM_SEED))
 
@@ -75,6 +76,7 @@ def main(verbose=True):
     parser.add_argument('--lamarck', default=LAMARCK, action='store_true', help='Lamarckian evolution'.format(SAVE_ALL))
     parser.add_argument('--text', default=TEXT, type=str, help='Text for image generation. Default is {}.'.format(TEXT))
     parser.add_argument('--image-size', default=IMAGE_SIZE, type=int, help='Image size. Default is {}.'.format(IMAGE_SIZE))
+    parser.add_argument('--num-cuts', default=NUM_CUTS, type=int, help='Number of cutouts. Default is {}.'.format(NUM_CUTS))
     args = parser.parse_args()
     save_folder = args.save_folder
     POP_SIZE = int(args.pop_size)
@@ -86,10 +88,11 @@ def main(verbose=True):
     SIGMA = args.sigma
     TEXT = args.text
     IMAGE_SIZE = args.image_size
+    NUM_CUTS = args.num_cuts
     experiment_name = f"{TEXT.replace(' ', '_')}_clip_cond_vector_{RANDOM_SEED or datetime.now().strftime('%Y-%m-%d_%H-%M')}"
     sub_folder = f"{experiment_name}_{N_GENS}_{POP_SIZE}_{SIGMA}_{LOCAL_SEARCH_STEPS}"
     np.random.seed(RANDOM_SEED)
-    model = big_sleep_cma_es.init(TEXT, image_size=IMAGE_SIZE)
+    model = big_sleep_cma_es.init(TEXT, cutn=NUM_CUTS, image_size=IMAGE_SIZE)
     NUM_LATENTS = len(model.config.layers) + 1
     save_folder, sub_folder = extra_tools.create_save_folder(save_folder, sub_folder)
     with open(os.path.join(save_folder, sub_folder, "params.json"), "w") as f:
