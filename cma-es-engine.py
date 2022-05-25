@@ -1,3 +1,5 @@
+import math
+
 import torch
 import json
 import os
@@ -22,6 +24,7 @@ COUNT_GENERATION = 0
 RANDOM_SEED = 64
 SAVE_ALL = False
 LAMARCK = False
+RANDOM_SEARCH = False
 LOCAL_SEARCH_STEPS = 0
 SIGMA = 0.2
 NUM_CUTS = 128
@@ -64,7 +67,7 @@ def main(verbose=True):
     # The cma module uses the np random number generator
     parser = argparse.ArgumentParser(description="evolve to objective")
     global COUNT_GENERATION, RANDOM_SEED, N_GENS, POP_SIZE, SAVE_ALL, LAMARCK, LOCAL_SEARCH_STEPS, SIGMA, \
-        TEXT, IMAGE_SIZE, NUM_LATENTS, NUM_CUTS, LEARNING_RATE
+        TEXT, IMAGE_SIZE, NUM_LATENTS, NUM_CUTS, LEARNING_RATE, RANDOM_SEARCH
 
     parser.add_argument('--random-seed', default=RANDOM_SEED, type=int, help='Use a specific random seed (for repeatability). Default is {}.'.format(RANDOM_SEED))
 
@@ -74,11 +77,12 @@ def main(verbose=True):
     parser.add_argument('--local-search-steps', default=LOCAL_SEARCH_STEPS, type=int, help='Local search steps. Default is {}.'.format(LOCAL_SEARCH_STEPS))
     parser.add_argument('--sigma', default=SIGMA, type=float, help='Sigma for cma-es. Default is {}.'.format(SIGMA))
     parser.add_argument('--save-all', default=SAVE_ALL, action='store_true', help='Save all Individual images. Default is {}.'.format(SAVE_ALL))
-    parser.add_argument('--lamarck', default=LAMARCK, action='store_true', help='Lamarckian evolution'.format(SAVE_ALL))
+    parser.add_argument('--lamarck', default=LAMARCK, action='store_true', help='Lamarckian evolution')
     parser.add_argument('--text', default=TEXT, type=str, help='Text for image generation. Default is {}.'.format(TEXT))
     parser.add_argument('--image-size', default=IMAGE_SIZE, type=int, help='Image size. Default is {}.'.format(IMAGE_SIZE))
     parser.add_argument('--num-cuts', default=NUM_CUTS, type=int, help='Number of cutouts. Default is {}.'.format(NUM_CUTS))
     parser.add_argument('--lr', default=LEARNING_RATE, type=float, help='Learning rate for adam. Default is {}.'.format(LEARNING_RATE))
+    parser.add_argument('--random-search', default=RANDOM_SEARCH, action='store_true', help='Random search')
     args = parser.parse_args()
     save_folder = args.save_folder
     POP_SIZE = int(args.pop_size)
@@ -92,6 +96,7 @@ def main(verbose=True):
     IMAGE_SIZE = args.image_size
     NUM_CUTS = args.num_cuts
     LEARNING_RATE = args.lr
+    RANDOM_SEARCH = args.random_search
     experiment_name = f"{TEXT.replace(' ', '_')}_clip_cond_vector_{RANDOM_SEED or datetime.now().strftime('%Y-%m-%d_%H-%M')}"
     sub_folder = f"{experiment_name}_{N_GENS}_{POP_SIZE}_{SIGMA}_{LOCAL_SEARCH_STEPS}"
     np.random.seed(RANDOM_SEED)
@@ -106,12 +111,15 @@ def main(verbose=True):
     individual = generate_individual_with_embeddings(NUM_LATENTS, Z_DIM)
 
     if POP_SIZE == 1:
-        logger.info("run non-evolutionary version")
-        cond_vector = big_sleep_cma_es.CondVectorParameters(individual, num_latents=NUM_LATENTS)
-        for gen in range(N_GENS):
-            loss = big_sleep_cma_es.evaluate_with_local_search(cond_vector, LOCAL_SEARCH_STEPS, lr=LEARNING_RATE)
-            print(gen, loss)
-            big_sleep_cma_es.save_individual_image(cond_vector, f"{save_folder}/{sub_folder}/{gen}_best.png")
+        if RANDOM_SEARCH:
+            random_search(individual, save_folder, sub_folder)
+        else:
+            logger.info("run non-evolutionary version (ADAM)")
+            cond_vector = big_sleep_cma_es.CondVectorParameters(individual, num_latents=NUM_LATENTS)
+            for gen in range(N_GENS):
+                loss = big_sleep_cma_es.evaluate_with_local_search(cond_vector, LOCAL_SEARCH_STEPS, lr=LEARNING_RATE)
+                print(gen, loss)
+                big_sleep_cma_es.save_individual_image(cond_vector, f"{save_folder}/{sub_folder}/{gen}_best.png")
         return
 
     # The CMA-ES algorithm takes a population of one individual as argument
@@ -165,6 +173,22 @@ def main(verbose=True):
             extra_tools.save_gen_best(save_folder, sub_folder, "experiment", [gen, halloffame[0], halloffame[0].fitness.values, "_"])
             cond_vector = big_sleep_cma_es.CondVectorParameters(np.array(halloffame[0]), num_latents=NUM_LATENTS)
             big_sleep_cma_es.save_individual_image(cond_vector, f"{save_folder}/{sub_folder}/{gen}_best.png")
+
+
+def random_search(individual, save_folder, sub_folder):
+    logger.info("run random search version")
+    best_loss = math.inf
+    best_vector = individual.copy()
+    for gen in range(N_GENS):
+        cond_vector = big_sleep_cma_es.CondVectorParameters(individual, num_latents=NUM_LATENTS)
+        _, _, loss = big_sleep_cma_es.evaluate_with_local_search(cond_vector, LOCAL_SEARCH_STEPS, lr=LEARNING_RATE)
+        print(gen, loss, best_loss)
+        big_sleep_cma_es.save_individual_image(cond_vector, f"{save_folder}/{sub_folder}/{gen}_best.png")
+        if loss < best_loss:
+            best_loss = loss
+            best_vector = individual.copy()
+        random_step = np.random.uniform(size=NUM_LATENTS * 256) * SIGMA
+        individual = best_vector + random_step
 
 
 if __name__ == "__main__":
