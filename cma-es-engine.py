@@ -182,7 +182,7 @@ def backprop_adam(individual, save_folder, sub_folder):
                                                                  lr=LEARNING_RATE)
         print(gen, loss)
         extra_tools.save_gen_best(save_folder, sub_folder, "experiment",
-                                  [gen, cond_vector.normu.cpu(), -loss.item(), "_"])
+                                  [gen, cond_vector.normu.cpu().detach().numpy().flatten(), -loss.item(), "_"])
         if SAVE_IMAGE_ALL_GEN or gen == N_GENS - 1:
             big_sleep_cma_es.save_individual_image(cond_vector, f"{save_folder}/{sub_folder}/{gen}_best.png")
 
