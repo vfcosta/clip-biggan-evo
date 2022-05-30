@@ -77,13 +77,7 @@ def create_save_folder(save_folder, sub_folder):
 
 
 def save_gen_best(save_folder, sub_folder, experiment_name, data):
-    with open(f"{save_folder}/{sub_folder}/{experiment_name}_gens_bests.txt", "a") as text_file:
-        if data[0] == 0:
-            print(f"gen ind fit height", file=text_file)
-        genotype = '[' + ','.join(map(lambda x: str(x), np.array(data[1]))) + ']'
-        
-        print(f"{data[0]} {genotype} {data[2]} {data[3]}", file=text_file)
-
+    genotype = '[' + ','.join(map(lambda x: str(x), np.array(data[1]))) + ']'
     with open(f"{save_folder}/{sub_folder}/{experiment_name}_gens_bests.csv", "a") as csv_file:
         csv_file = csv.writer(csv_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         if data[0] == 0:
