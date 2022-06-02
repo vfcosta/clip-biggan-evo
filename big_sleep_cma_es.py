@@ -143,8 +143,9 @@ def evaluate(cond_vector_params):
     # classes.data[1:, :] = classes.data[0]
     out = model(cond_vector, 1)  # 1 x 3 x 512 x 512
 
+    map_fitness = 0
     if USE_MAP_FITNESS:
-        return [0, 0, torch.tensor(evaluate_map(((out + 1) * 127.5)))]
+        map_fitness = torch.tensor(evaluate_map(((out + 1) * 127.5)))
 
     p_s = []
     sideX, sideY, channels = im_shape
@@ -177,7 +178,9 @@ def evaluate(cond_vector_params):
     # cls_l = ((50*torch.topk(llls[1],largest=False,dim=1,k=999)[0])**2).mean()
     cls_l = 0
 
-    return [lat_l, cls_l, -100 * torch.cosine_similarity(text_features, iii, dim=-1).mean()]
+    cos_similarity = torch.cosine_similarity(text_features, iii, dim=-1).mean()
+    print(map_fitness, cos_similarity)
+    return [lat_l, cls_l, -100 * cos_similarity, 100 * map_fitness]
 
 
 def evaluate_with_local_search(cond_vector_params, local_search_steps=5, lr=.07):
