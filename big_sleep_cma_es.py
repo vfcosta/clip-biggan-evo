@@ -7,6 +7,7 @@ Also available at https://github.com/lucidrains/big-sleep
 """
 
 import logging
+import pickle
 
 import clip
 import imageio
@@ -14,13 +15,11 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import torchvision
+from umap.parametric_umap import load_ParametricUMAP
 
 from biggan import BigGAN
 
 logger = logging.getLogger(__name__)
-
-# Load the model
-perceptor, preprocess = clip.load('ViT-B/32')
 
 seed = 0
 MAX_CLASSES = 0
@@ -41,6 +40,14 @@ model = None
 CUDA_AVAILABLE = torch.cuda.is_available()
 logger.info("CUDA: %s", CUDA_AVAILABLE)
 DEVICE = torch.device('cuda') if CUDA_AVAILABLE else torch.device('cpu')
+
+# Load the model
+perceptor, preprocess = clip.load('ViT-B/32', DEVICE)
+
+
+USE_MAP_FITNESS = True
+MAP_POINT = np.array([3.9486639499664307, 3.5445408821105957])
+reduction_model = None
 
 
 def init(text, cutn=128, image_size=512):
@@ -106,6 +113,27 @@ def save_individual_image(cond_vector, file_name):
         imageio.imwrite(file_name, ((img + 1) * 127.5).astype(np.uint8))
 
 
+def evaluate_map(images, use_features=True):
+    global reduction_model
+    if reduction_model is None:
+        logger.info("loading dim_reduction model")
+        with open("dim_reduction.pkl", "rb") as f:
+            reduction_model = pickle.load(f)
+        # reduction_model = load_ParametricUMAP("gen-tsne/model_parametric_umap")
+
+    if use_features:  # use clip features
+        features = perceptor.encode_image(
+            torch.nn.functional.interpolate(images, (224, 224), mode='nearest').int()).detach().cpu().numpy()
+    else:
+        images = torch.nn.functional.interpolate(images, (128, 128), mode='nearest').int()
+        features = images.detach().cpu().numpy().reshape(1, -1)
+    points = reduction_model.transform(features)
+    mean_distances = np.linalg.norm(points - MAP_POINT, axis=1).mean()  # calc euclidean distance between the two points
+    print(points, MAP_POINT)
+    print(mean_distances)
+    return mean_distances
+
+
 def evaluate(cond_vector_params):
     cond_vector = cond_vector_params()  # 16 x 256
     # input()
@@ -114,6 +142,9 @@ def evaluate(cond_vector_params):
     # z.data[1 :, :] = z.data[0]
     # classes.data[1:, :] = classes.data[0]
     out = model(cond_vector, 1)  # 1 x 3 x 512 x 512
+
+    if USE_MAP_FITNESS:
+        return [0, 0, torch.tensor(evaluate_map(((out + 1) * 127.5)))]
 
     p_s = []
     sideX, sideY, channels = im_shape
@@ -126,10 +157,7 @@ def evaluate(cond_vector_params):
     # convert_tensor = torchvision.transforms.ToTensor()
     into = torch.cat(p_s, 0)
 
-    # into = torch.nn.functional.interpolate(out, (224,224), mode='nearest')
-
     into = nom(((into) + 1) / 2)
-
     iii = perceptor.encode_image(into)  # 128 x 512
 
     # llls = cond_vector_params()
