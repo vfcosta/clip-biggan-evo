@@ -42,10 +42,10 @@ def clip_fitness(individual):
     result = big_sleep_cma_es.evaluate_with_local_search(conditional_vector, LOCAL_SEARCH_STEPS, lr=LEARNING_RATE)
     if LAMARCK:
         individual[:] = conditional_vector().cpu().detach().numpy().flatten()
-    return float(result[2].float().cpu()), float(result[3].float().cpu())
+    return -float(result[2].float().cpu()), -float(result[3].float().cpu())
 
 
-creator.create("FitnessMax", base.Fitness, weights=(-1.0, -1.0))
+creator.create("FitnessMax", base.Fitness, weights=(1.0, 1.0))
 creator.create("Individual", np.ndarray, fitness=creator.FitnessMax)
 
 toolbox = base.Toolbox()
