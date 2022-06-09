@@ -45,7 +45,7 @@ DEVICE = torch.device('cuda') if CUDA_AVAILABLE else torch.device('cpu')
 perceptor, preprocess = clip.load('ViT-B/32', DEVICE)
 
 
-USE_MAP_FITNESS = True
+USE_MAP_FITNESS = False
 MAP_POINT = np.array([3.9486639499664307, 3.5445408821105957])
 reduction_model = None
 
@@ -129,8 +129,6 @@ def evaluate_map(images, use_features=True):
         features = images.detach().cpu().numpy().reshape(1, -1)
     points = reduction_model.transform(features)
     mean_distances = np.linalg.norm(points - MAP_POINT, axis=1).mean()  # calc euclidean distance between the two points
-    print(points, MAP_POINT)
-    print(mean_distances)
     return mean_distances
 
 
@@ -179,7 +177,6 @@ def evaluate(cond_vector_params):
     cls_l = 0
 
     cos_similarity = torch.cosine_similarity(text_features, iii, dim=-1).mean()
-    print(map_fitness, cos_similarity)
     return [lat_l, cls_l, -100 * cos_similarity, 100 * map_fitness]
 
 
