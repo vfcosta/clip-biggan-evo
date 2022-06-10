@@ -178,7 +178,7 @@ def backprop_adam(individual, save_folder, sub_folder):
     logger.info("run non-evolutionary version (ADAM)")
     cond_vector = big_sleep_cma_es.CondVectorParameters(individual, num_latents=NUM_LATENTS)
     for gen in range(N_GENS):
-        _, _, loss = big_sleep_cma_es.evaluate_with_local_search(cond_vector, LOCAL_SEARCH_STEPS,
+        _, _, loss, _ = big_sleep_cma_es.evaluate_with_local_search(cond_vector, LOCAL_SEARCH_STEPS,
                                                                  lr=LEARNING_RATE)
         print(gen, loss)
         extra_tools.save_gen_best(save_folder, sub_folder, "experiment",
@@ -193,7 +193,7 @@ def random_search(individual, save_folder, sub_folder):
     best_vector = individual.copy()
     for gen in range(N_GENS):
         cond_vector = big_sleep_cma_es.CondVectorParameters(individual, num_latents=NUM_LATENTS)
-        _, _, loss = big_sleep_cma_es.evaluate_with_local_search(cond_vector, LOCAL_SEARCH_STEPS, lr=LEARNING_RATE)
+        _, _, loss, _ = big_sleep_cma_es.evaluate_with_local_search(cond_vector, LOCAL_SEARCH_STEPS, lr=LEARNING_RATE)
         print(gen, loss, best_loss)
         if loss < best_loss:
             best_loss = loss
