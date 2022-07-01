@@ -19,9 +19,9 @@ def read_path(dir_path):
         df = pd.read_csv(f, usecols=["fit", "gen"])
         # fix the fitness format
         df["Cosine similarity"] = df["fit"].apply(lambda x: float(x.split(",")[0][1:]) if isinstance(x, str) else x)
-        df["Iteration (%)"] = 100 * df["gen"] / df["gen"].max()
-        # print(df["Iteration (%)"])
+        df["Iteration (%)"] = df["gen"]
         df_all = pd.concat((df_all, df[["Iteration (%)", "Cosine similarity"]]))
+    df_all["Iteration (%)"] = 100 * df_all["Iteration (%)"] / df_all["Iteration (%)"].max()
     return df_all
 
 
@@ -41,7 +41,7 @@ def generate(dir_cmaes, dir_hybrid, dir_adam):
 
 
 if __name__ == "__main__":
-    plt.rcParams.update({'font.size': 12})
+    plt.rcParams.update({'font.size': 14})
     prefixes = ["new_exp", "vader_exp", "fox_exp"]
     for prefix in prefixes:
         print(f"generating {prefix}")
