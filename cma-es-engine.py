@@ -35,6 +35,8 @@ TEXT = "a painting of superman by van gogh"
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+DEVICE = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+
 
 def clip_fitness(individual):
     ind_array = np.array(individual)
@@ -53,8 +55,8 @@ toolbox.register("evaluate", clip_fitness)
 
 
 def generate_individual_with_embeddings(num_latents, z_dim):
-    latent = torch.nn.Parameter(torch.zeros(num_latents, z_dim).normal_(std=1).float().cuda())
-    params_other = torch.zeros(num_latents, 1000).normal_(-3.9, .3).cuda()
+    latent = torch.nn.Parameter(torch.zeros(num_latents, z_dim).normal_(std=1).float().to(DEVICE))
+    params_other = torch.zeros(num_latents, 1000).normal_(-3.9, .3).to(DEVICE)
     classes = torch.sigmoid(torch.nn.Parameter(params_other))
     embed = big_sleep_cma_es.model.embeddings(classes)
     cond_vector = torch.cat((latent, embed), dim=1)

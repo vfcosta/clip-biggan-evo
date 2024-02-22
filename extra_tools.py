@@ -9,7 +9,7 @@ from operator import add, itemgetter
 IMG_SIZE = IMG_WIDTH, IMG_HEIGHT = (256, 256)  # ATTENTION!!!! Only square images now please.
 
 
-r = np.transpose(np.indices((IMG_SIZE[0], IMG_SIZE[1], 3), dtype=np.int), (2, 1, 3, 0))
+r = np.transpose(np.indices((IMG_SIZE[0], IMG_SIZE[1], 3), dtype=np.int32), (2, 1, 3, 0))
 r = r[:, :, :, 0:2]
 pointN = r.reshape(IMG_SIZE[0] * IMG_SIZE[1], 3, 2)
 x = pointN[:, :, 0]
