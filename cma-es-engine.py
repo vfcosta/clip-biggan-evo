@@ -182,7 +182,7 @@ def backprop_adam(individual, save_folder, sub_folder):
     for gen in range(N_GENS):
         _, _, loss, _ = big_sleep_cma_es.evaluate_with_local_search(cond_vector, LOCAL_SEARCH_STEPS,
                                                                  lr=LEARNING_RATE)
-        print(gen, loss)
+        print("ADAM", gen, loss)
         extra_tools.save_gen_best(save_folder, sub_folder, "experiment",
                                   [gen, cond_vector.normu.cpu().detach().numpy().flatten(), -loss.item(), "_"])
         if SAVE_IMAGE_ALL_GEN or gen == N_GENS - 1:
@@ -196,7 +196,7 @@ def random_search(individual, save_folder, sub_folder):
     for gen in range(N_GENS):
         cond_vector = big_sleep_cma_es.CondVectorParameters(individual, num_latents=NUM_LATENTS)
         _, _, loss, _ = big_sleep_cma_es.evaluate_with_local_search(cond_vector, LOCAL_SEARCH_STEPS, lr=LEARNING_RATE)
-        print(gen, loss, best_loss)
+        print("RANDOM", gen, loss, best_loss)
         if loss < best_loss:
             best_loss = loss
             best_vector = individual.copy()

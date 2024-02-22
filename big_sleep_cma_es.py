@@ -42,7 +42,8 @@ logger.info("CUDA: %s", CUDA_AVAILABLE)
 DEVICE = torch.device('cuda') if CUDA_AVAILABLE else torch.device('cpu')
 
 # Load the model
-perceptor, preprocess = clip.load('ViT-B/32', DEVICE)
+CLIP_MODEL = 'ViT-B/32'
+perceptor, preprocess = clip.load(CLIP_MODEL, DEVICE)
 
 
 USE_MAP_FITNESS = False
