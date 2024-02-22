@@ -30,6 +30,7 @@ LOCAL_SEARCH_STEPS = 0
 SIGMA = 0.2
 NUM_CUTS = 128
 LEARNING_RATE = 0.07
+USE_MAP_FITNESS = False
 TEXT = "a painting of superman by van gogh"
 
 logging.basicConfig(level=logging.INFO)
@@ -41,7 +42,8 @@ DEVICE = torch.device('cuda') if torch.cuda.is_available() else torch.device('cp
 def clip_fitness(individual):
     ind_array = np.array(individual)
     conditional_vector = big_sleep_cma_es.CondVectorParameters(ind_array, num_latents=NUM_LATENTS)
-    result = big_sleep_cma_es.evaluate_with_local_search(conditional_vector, LOCAL_SEARCH_STEPS, lr=LEARNING_RATE)
+    result = big_sleep_cma_es.evaluate_with_local_search(conditional_vector, LOCAL_SEARCH_STEPS, lr=LEARNING_RATE,
+                                                         use_map_fitness=USE_MAP_FITNESS)
     if LAMARCK:
         individual[:] = conditional_vector().cpu().detach().numpy().flatten()
     return -float(result[2].float().cpu()),
@@ -70,7 +72,7 @@ def main(verbose=True):
     # The cma module uses the np random number generator
     parser = argparse.ArgumentParser(description="evolve to objective")
     global COUNT_GENERATION, RANDOM_SEED, N_GENS, POP_SIZE, SAVE_ALL, LAMARCK, LOCAL_SEARCH_STEPS, SIGMA, \
-        TEXT, IMAGE_SIZE, NUM_LATENTS, NUM_CUTS, LEARNING_RATE, RANDOM_SEARCH, SAVE_IMAGE_ALL_GEN
+        TEXT, IMAGE_SIZE, NUM_LATENTS, NUM_CUTS, LEARNING_RATE, RANDOM_SEARCH, SAVE_IMAGE_ALL_GEN, USE_MAP_FITNESS
 
     parser.add_argument('--random-seed', default=RANDOM_SEED, type=int, help='Use a specific random seed (for repeatability). Default is {}.'.format(RANDOM_SEED))
 
@@ -87,6 +89,7 @@ def main(verbose=True):
     parser.add_argument('--lr', default=LEARNING_RATE, type=float, help='Learning rate for adam. Default is {}.'.format(LEARNING_RATE))
     parser.add_argument('--random-search', default=RANDOM_SEARCH, action='store_true', help='Random search')
     parser.add_argument('--save-only-last', default=SAVE_IMAGE_ALL_GEN, action='store_false', help='Save only the last image')
+    parser.add_argument('--use-map-fitness', default=USE_MAP_FITNESS, action='store_true', help='Use map fitness')
     args = parser.parse_args()
     save_folder = args.save_folder
     POP_SIZE = int(args.pop_size)
@@ -101,6 +104,7 @@ def main(verbose=True):
     NUM_CUTS = args.num_cuts
     LEARNING_RATE = args.lr
     RANDOM_SEARCH = args.random_search
+    USE_MAP_FITNESS = args.use_map_fitness
     SAVE_IMAGE_ALL_GEN = args.save_only_last
     experiment_name = f"{TEXT.replace(' ', '_')}_clip_cond_vector_{RANDOM_SEED or datetime.now().strftime('%Y-%m-%d_%H-%M')}"
     sub_folder = f"{experiment_name}_{N_GENS}_{POP_SIZE}_{SIGMA}_{LOCAL_SEARCH_STEPS}"
