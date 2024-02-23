@@ -46,7 +46,7 @@ CLIP_MODEL = 'ViT-B/32'
 perceptor, preprocess = clip.load(CLIP_MODEL, DEVICE)
 
 
-MAP_POINT = np.array([3.9486639499664307, 3.5445408821105957])
+MAP_POINT = np.array([1.7, 1.7])
 reduction_model = None
 
 
@@ -113,13 +113,13 @@ def save_individual_image(cond_vector, file_name):
         imageio.imwrite(file_name, ((img + 1) * 127.5).astype(np.uint8))
 
 
-def evaluate_map(images, use_features=True):
+def evaluate_map(images, use_features=False):
     global reduction_model
     if reduction_model is None:
         logger.info("loading dim_reduction model")
-        with open("dim_reduction.pkl", "rb") as f:
-            reduction_model = pickle.load(f)
-        # reduction_model = load_ParametricUMAP("gen-tsne/model_parametric_umap")
+        # with open("dim_reduction.pkl", "rb") as f:
+        #     reduction_model = pickle.load(f)
+        reduction_model = load_ParametricUMAP("../gen-tsne/model_parametric_umap")
 
     if use_features:  # use clip features
         features = perceptor.encode_image(
@@ -129,10 +129,11 @@ def evaluate_map(images, use_features=True):
         features = images.detach().cpu().numpy().reshape(1, -1)
     points = reduction_model.transform(features)
     mean_distances = np.linalg.norm(points - MAP_POINT, axis=1).mean()  # calc euclidean distance between the two points
+    print("map distances", mean_distances)
     return mean_distances
 
 
-def evaluate(cond_vector_params, use_map_fitness=False):
+def evaluate(cond_vector_params, use_map_fitness=False, use_features=False):
     cond_vector = cond_vector_params()  # 16 x 256
     # input()
     # z = cenas[0]
@@ -143,7 +144,7 @@ def evaluate(cond_vector_params, use_map_fitness=False):
 
     map_fitness = 0
     if use_map_fitness:
-        map_fitness = torch.tensor(evaluate_map(((out + 1) * 127.5)))
+        map_fitness = torch.tensor(evaluate_map(((out + 1) * 127.5), use_features=use_features))
 
     p_s = []
     sideX, sideY, channels = im_shape
@@ -180,13 +181,15 @@ def evaluate(cond_vector_params, use_map_fitness=False):
     return [lat_l, cls_l, -100 * cos_similarity, 100 * map_fitness]
 
 
-def evaluate_with_local_search(cond_vector_params, local_search_steps=5, lr=.07, use_map_fitness=False):
+def evaluate_with_local_search(cond_vector_params, local_search_steps=5, lr=.07, use_map_fitness=False,
+                               use_features=False):
     local_search_optimizer = torch.optim.Adam(cond_vector_params.parameters(), lr) if local_search_steps else None
-    loss1 = evaluate(cond_vector_params, use_map_fitness=use_map_fitness)
+    loss1 = evaluate(cond_vector_params, use_map_fitness=use_map_fitness, use_features=use_features)
     for i in range(local_search_steps):
         loss = loss1[0] + loss1[1] + loss1[2]
         local_search_optimizer.zero_grad()
         loss.backward()
         local_search_optimizer.step()
-        loss1 = evaluate(cond_vector_params, use_map_fitness=use_map_fitness)
+        loss1 = evaluate(cond_vector_params, use_map_fitness=use_map_fitness and i == local_search_steps - 1,
+                         use_features=use_features)
     return loss1

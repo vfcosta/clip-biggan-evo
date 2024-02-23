@@ -31,6 +31,7 @@ SIGMA = 0.2
 NUM_CUTS = 128
 LEARNING_RATE = 0.07
 USE_MAP_FITNESS = False
+USE_FEATURES = False
 TEXT = "a painting of superman by van gogh"
 
 logging.basicConfig(level=logging.INFO)
@@ -43,7 +44,7 @@ def clip_fitness(individual):
     ind_array = np.array(individual)
     conditional_vector = big_sleep_cma_es.CondVectorParameters(ind_array, num_latents=NUM_LATENTS)
     result = big_sleep_cma_es.evaluate_with_local_search(conditional_vector, LOCAL_SEARCH_STEPS, lr=LEARNING_RATE,
-                                                         use_map_fitness=USE_MAP_FITNESS)
+                                                         use_map_fitness=USE_MAP_FITNESS, use_features=USE_FEATURES)
     if LAMARCK:
         individual[:] = conditional_vector().cpu().detach().numpy().flatten()
     return -float(result[2].float().cpu()),
@@ -72,7 +73,8 @@ def main(verbose=True):
     # The cma module uses the np random number generator
     parser = argparse.ArgumentParser(description="evolve to objective")
     global COUNT_GENERATION, RANDOM_SEED, N_GENS, POP_SIZE, SAVE_ALL, LAMARCK, LOCAL_SEARCH_STEPS, SIGMA, \
-        TEXT, IMAGE_SIZE, NUM_LATENTS, NUM_CUTS, LEARNING_RATE, RANDOM_SEARCH, SAVE_IMAGE_ALL_GEN, USE_MAP_FITNESS
+        TEXT, IMAGE_SIZE, NUM_LATENTS, NUM_CUTS, LEARNING_RATE, RANDOM_SEARCH, SAVE_IMAGE_ALL_GEN, USE_MAP_FITNESS, \
+        USE_FEATURES
 
     parser.add_argument('--random-seed', default=RANDOM_SEED, type=int, help='Use a specific random seed (for repeatability). Default is {}.'.format(RANDOM_SEED))
 
@@ -90,6 +92,7 @@ def main(verbose=True):
     parser.add_argument('--random-search', default=RANDOM_SEARCH, action='store_true', help='Random search')
     parser.add_argument('--save-only-last', default=SAVE_IMAGE_ALL_GEN, action='store_false', help='Save only the last image')
     parser.add_argument('--use-map-fitness', default=USE_MAP_FITNESS, action='store_true', help='Use map fitness')
+    parser.add_argument('--use-features', default=USE_FEATURES, action='store_true', help='Use features in map fitness')
     args = parser.parse_args()
     save_folder = args.save_folder
     POP_SIZE = int(args.pop_size)
@@ -184,8 +187,7 @@ def backprop_adam(individual, save_folder, sub_folder):
     logger.info("run non-evolutionary version (ADAM)")
     cond_vector = big_sleep_cma_es.CondVectorParameters(individual, num_latents=NUM_LATENTS)
     for gen in range(N_GENS):
-        _, _, loss, _ = big_sleep_cma_es.evaluate_with_local_search(cond_vector, LOCAL_SEARCH_STEPS,
-                                                                 lr=LEARNING_RATE)
+        _, _, loss, _ = big_sleep_cma_es.evaluate_with_local_search(cond_vector, LOCAL_SEARCH_STEPS, lr=LEARNING_RATE)
         print("ADAM", gen, loss)
         extra_tools.save_gen_best(save_folder, sub_folder, "experiment",
                                   [gen, cond_vector.normu.cpu().detach().numpy().flatten(), -loss.item(), "_"])
