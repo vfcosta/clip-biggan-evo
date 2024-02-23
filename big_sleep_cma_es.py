@@ -46,7 +46,7 @@ CLIP_MODEL = 'ViT-B/32'
 perceptor, preprocess = clip.load(CLIP_MODEL, DEVICE)
 
 
-MAP_POINT = np.array([1.7, 1.7])
+MAP_POINT = None
 reduction_model = None
 
 
@@ -114,13 +114,23 @@ def save_individual_image(cond_vector, file_name):
 
 
 def evaluate_map(images, use_features=False):
-    global reduction_model
+    global reduction_model, MAP_POINT
     if reduction_model is None:
         logger.info("loading dim_reduction model")
         # with open("dim_reduction.pkl", "rb") as f:
         #     reduction_model = pickle.load(f)
         reduction_model = load_ParametricUMAP("../gen-tsne/model_parametric_umap")
+        reference_image = torchvision.io.read_image("2024/experiments/a_painting_of_superman_by_van_gogh_clip_cond_vector_64_30_10_0.2_5_v129/29_best.png")
+        MAP_POINT = calculate_map_points(reference_image.unsqueeze(0), reduction_model, use_features)[0]
 
+    points = calculate_map_points(images, reduction_model, use_features)
+    print(points, MAP_POINT)
+    mean_distances = np.linalg.norm(points - MAP_POINT, axis=1).mean()  # calc euclidean distance between the two points
+    print("map distances", mean_distances)
+    return mean_distances
+
+
+def calculate_map_points(images, reduction_model, use_features):
     if use_features:  # use clip features
         features = perceptor.encode_image(
             torch.nn.functional.interpolate(images, (224, 224), mode='nearest').int()).detach().cpu().numpy()
@@ -128,9 +138,7 @@ def evaluate_map(images, use_features=False):
         images = torch.nn.functional.interpolate(images, (128, 128), mode='nearest').int()
         features = images.detach().cpu().numpy().reshape(1, -1)
     points = reduction_model.transform(features)
-    mean_distances = np.linalg.norm(points - MAP_POINT, axis=1).mean()  # calc euclidean distance between the two points
-    print("map distances", mean_distances)
-    return mean_distances
+    return points
 
 
 def evaluate(cond_vector_params, use_map_fitness=False, use_features=False):
