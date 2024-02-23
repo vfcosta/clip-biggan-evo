@@ -162,7 +162,7 @@ def main(verbose=True):
         COUNT_GENERATION = gen
         fitnesses = toolbox.map(toolbox.evaluate, population)
         for ind, fit in zip(population, fitnesses):
-            print("fitnesses", ind, fit)
+            print("fitnesses", fit)
             ind.fitness.values = fit
 
         if SAVE_ALL or gen == N_GENS - 1:

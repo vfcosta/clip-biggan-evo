@@ -124,7 +124,7 @@ def evaluate_map(images, use_features=False, reference_image=None):
         MAP_POINT = calculate_map_points(reference_image.unsqueeze(0).to(DEVICE), reduction_model, use_features)[0]
 
     points = calculate_map_points(images, reduction_model, use_features)
-    print(points, MAP_POINT)
+    # print(points, MAP_POINT)
     mean_distances = np.linalg.norm(points - MAP_POINT, axis=1).mean()  # calc euclidean distance between the two points
     print("map distances", mean_distances)
     return mean_distances
@@ -133,7 +133,7 @@ def evaluate_map(images, use_features=False, reference_image=None):
 def calculate_map_points(images, reduction_model, use_features):
     if use_features:  # use clip features
         features = perceptor.encode_image(
-            torch.nn.functional.interpolate(images, (224, 224), mode='nearest').int()).detach().cpu().numpy()
+            torch.nn.functional.interpolate(images, (224, 224), mode='nearest')).detach().cpu().numpy()
     else:
         images = torch.nn.functional.interpolate(images, (128, 128), mode='nearest').int()
         features = images.detach().cpu().numpy().reshape(1, -1)
@@ -193,13 +193,12 @@ def evaluate(cond_vector_params, use_map_fitness=False, use_features=False, refe
 def evaluate_with_local_search(cond_vector_params, local_search_steps=5, lr=.07, use_map_fitness=False,
                                use_features=False, reference_image=None):
     local_search_optimizer = torch.optim.Adam(cond_vector_params.parameters(), lr) if local_search_steps else None
-    loss1 = evaluate(cond_vector_params, use_map_fitness=use_map_fitness, use_features=use_features,
-                     reference_image=reference_image)
     for i in range(local_search_steps):
+        loss1 = evaluate(cond_vector_params)
         loss = loss1[0] + loss1[1] + loss1[2]
         local_search_optimizer.zero_grad()
         loss.backward()
         local_search_optimizer.step()
-        loss1 = evaluate(cond_vector_params, use_map_fitness=use_map_fitness and i == local_search_steps - 1,
-                         use_features=use_features, reference_image=reference_image)
+    loss1 = evaluate(cond_vector_params, use_map_fitness=use_map_fitness, use_features=use_features,
+                     reference_image=reference_image)
     return loss1
