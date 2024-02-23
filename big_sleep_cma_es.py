@@ -113,15 +113,15 @@ def save_individual_image(cond_vector, file_name):
         imageio.imwrite(file_name, ((img + 1) * 127.5).astype(np.uint8))
 
 
-def evaluate_map(images, use_features=False):
+def evaluate_map(images, use_features=False, reference_image=None):
     global reduction_model, MAP_POINT
     if reduction_model is None:
         logger.info("loading dim_reduction model")
         # with open("dim_reduction.pkl", "rb") as f:
         #     reduction_model = pickle.load(f)
         reduction_model = load_ParametricUMAP("../gen-tsne/model_parametric_umap")
-        reference_image = torchvision.io.read_image("2024/experiments/a_painting_of_superman_by_van_gogh_clip_cond_vector_64_30_10_0.2_5_v129/29_best.png")
-        MAP_POINT = calculate_map_points(reference_image.unsqueeze(0), reduction_model, use_features)[0]
+        reference_image = torchvision.io.read_image(reference_image)
+        MAP_POINT = calculate_map_points(reference_image.unsqueeze(0).to(DEVICE), reduction_model, use_features)[0]
 
     points = calculate_map_points(images, reduction_model, use_features)
     print(points, MAP_POINT)
@@ -141,7 +141,7 @@ def calculate_map_points(images, reduction_model, use_features):
     return points
 
 
-def evaluate(cond_vector_params, use_map_fitness=False, use_features=False):
+def evaluate(cond_vector_params, use_map_fitness=False, use_features=False, reference_image=None):
     cond_vector = cond_vector_params()  # 16 x 256
     # input()
     # z = cenas[0]
@@ -152,7 +152,8 @@ def evaluate(cond_vector_params, use_map_fitness=False, use_features=False):
 
     map_fitness = 0
     if use_map_fitness:
-        map_fitness = torch.tensor(evaluate_map(((out + 1) * 127.5), use_features=use_features))
+        map_fitness = torch.tensor(evaluate_map(((out + 1) * 127.5), use_features=use_features,
+                                                reference_image=reference_image))
 
     p_s = []
     sideX, sideY, channels = im_shape
@@ -186,18 +187,19 @@ def evaluate(cond_vector_params, use_map_fitness=False, use_features=False):
     cls_l = 0
 
     cos_similarity = torch.cosine_similarity(text_features, iii, dim=-1).mean()
-    return [lat_l, cls_l, -100 * cos_similarity, 100 * map_fitness]
+    return [lat_l, cls_l, -100 * cos_similarity, map_fitness]
 
 
 def evaluate_with_local_search(cond_vector_params, local_search_steps=5, lr=.07, use_map_fitness=False,
-                               use_features=False):
+                               use_features=False, reference_image=None):
     local_search_optimizer = torch.optim.Adam(cond_vector_params.parameters(), lr) if local_search_steps else None
-    loss1 = evaluate(cond_vector_params, use_map_fitness=use_map_fitness, use_features=use_features)
+    loss1 = evaluate(cond_vector_params, use_map_fitness=use_map_fitness, use_features=use_features,
+                     reference_image=reference_image)
     for i in range(local_search_steps):
         loss = loss1[0] + loss1[1] + loss1[2]
         local_search_optimizer.zero_grad()
         loss.backward()
         local_search_optimizer.step()
         loss1 = evaluate(cond_vector_params, use_map_fitness=use_map_fitness and i == local_search_steps - 1,
-                         use_features=use_features)
+                         use_features=use_features, reference_image=reference_image)
     return loss1

@@ -32,6 +32,7 @@ NUM_CUTS = 128
 LEARNING_RATE = 0.07
 USE_MAP_FITNESS = False
 USE_FEATURES = False
+REFERENCE_IMAGE = None
 TEXT = "a painting of superman by van gogh"
 
 logging.basicConfig(level=logging.INFO)
@@ -44,9 +45,12 @@ def clip_fitness(individual):
     ind_array = np.array(individual)
     conditional_vector = big_sleep_cma_es.CondVectorParameters(ind_array, num_latents=NUM_LATENTS)
     result = big_sleep_cma_es.evaluate_with_local_search(conditional_vector, LOCAL_SEARCH_STEPS, lr=LEARNING_RATE,
-                                                         use_map_fitness=USE_MAP_FITNESS, use_features=USE_FEATURES)
+                                                         use_map_fitness=USE_MAP_FITNESS, use_features=USE_FEATURES,
+                                                         reference_image=REFERENCE_IMAGE)
     if LAMARCK:
         individual[:] = conditional_vector().cpu().detach().numpy().flatten()
+    if USE_MAP_FITNESS:
+        return -float(result[3].float().cpu()),
     return -float(result[2].float().cpu()),
 
 
@@ -74,7 +78,7 @@ def main(verbose=True):
     parser = argparse.ArgumentParser(description="evolve to objective")
     global COUNT_GENERATION, RANDOM_SEED, N_GENS, POP_SIZE, SAVE_ALL, LAMARCK, LOCAL_SEARCH_STEPS, SIGMA, \
         TEXT, IMAGE_SIZE, NUM_LATENTS, NUM_CUTS, LEARNING_RATE, RANDOM_SEARCH, SAVE_IMAGE_ALL_GEN, USE_MAP_FITNESS, \
-        USE_FEATURES
+        USE_FEATURES, REFERENCE_IMAGE
 
     parser.add_argument('--random-seed', default=RANDOM_SEED, type=int, help='Use a specific random seed (for repeatability). Default is {}.'.format(RANDOM_SEED))
 
@@ -93,6 +97,7 @@ def main(verbose=True):
     parser.add_argument('--save-only-last', default=SAVE_IMAGE_ALL_GEN, action='store_false', help='Save only the last image')
     parser.add_argument('--use-map-fitness', default=USE_MAP_FITNESS, action='store_true', help='Use map fitness')
     parser.add_argument('--use-features', default=USE_FEATURES, action='store_true', help='Use features in map fitness')
+    parser.add_argument('--reference-image', default=REFERENCE_IMAGE, type=str, help='Reference image for map fitness')
     args = parser.parse_args()
     save_folder = args.save_folder
     POP_SIZE = int(args.pop_size)
@@ -108,6 +113,8 @@ def main(verbose=True):
     LEARNING_RATE = args.lr
     RANDOM_SEARCH = args.random_search
     USE_MAP_FITNESS = args.use_map_fitness
+    USE_FEATURES = args.use_features
+    REFERENCE_IMAGE = args.reference_image
     SAVE_IMAGE_ALL_GEN = args.save_only_last
     experiment_name = f"{TEXT.replace(' ', '_')}_clip_cond_vector_{RANDOM_SEED or datetime.now().strftime('%Y-%m-%d_%H-%M')}"
     sub_folder = f"{experiment_name}_{N_GENS}_{POP_SIZE}_{SIGMA}_{LOCAL_SEARCH_STEPS}"
@@ -155,6 +162,7 @@ def main(verbose=True):
         COUNT_GENERATION = gen
         fitnesses = toolbox.map(toolbox.evaluate, population)
         for ind, fit in zip(population, fitnesses):
+            print("fitnesses", ind, fit)
             ind.fitness.values = fit
 
         if SAVE_ALL or gen == N_GENS - 1:
