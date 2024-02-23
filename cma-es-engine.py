@@ -15,7 +15,7 @@ import logging
 import big_sleep_cma_es
 
 # Problem size
-N_GENS = 125
+N_GENS = 50
 POP_SIZE = 10
 NUM_LATENTS = None  # na verdade é o número de vetores latentes (z => layers_biggan + 1)  https://github.com/lucidrains/big-sleep/issues/34
 IMAGE_SIZE = 512
@@ -24,7 +24,7 @@ COUNT_GENERATION = 0
 RANDOM_SEED = 64
 SAVE_ALL = False
 SAVE_IMAGE_ALL_GEN = True
-LAMARCK = False
+LAMARCK = True
 RANDOM_SEARCH = False
 LOCAL_SEARCH_STEPS = 0
 SIGMA = 0.2
