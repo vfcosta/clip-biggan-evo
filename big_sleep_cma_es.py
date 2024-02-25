@@ -50,11 +50,18 @@ MAP_POINT = None
 reduction_model = None
 
 
-def init(text, cutn=128, image_size=512):
+def init(text, cutn=128, image_size=512, use_map_fitness=False, use_features=False, reference_image=None):
     global text_features, frase, cuts, model, im_shape, num_cuts
     num_cuts = cutn
     frase = text
     tx = clip.tokenize(text)
+    # if use_map_fitness and use_features:
+    #     if reduction_model is None:
+    #         load_reduction_model(reference_image, use_features)
+    #     text_features = torch.from_numpy(reduction_model.inverse_transform([MAP_POINT])).to(DEVICE)
+    #     print("text_features", text_features.shape)
+    #
+    # else:
     text_features = perceptor.encode_text(tx.to(DEVICE)).detach().clone()  # 1 x 512
 
     model = BigGAN.from_pretrained(f'biggan-deep-{image_size}')
@@ -113,7 +120,7 @@ def save_individual_image(cond_vector, file_name):
         imageio.imwrite(file_name, ((img + 1) * 127.5).astype(np.uint8))
 
 
-def evaluate_map(images, use_features=False, reference_image=None):
+def load_reduction_model(reference_image, use_features):
     global reduction_model, MAP_POINT
     if reduction_model is None:
         logger.info("loading dim_reduction model")
@@ -124,6 +131,10 @@ def evaluate_map(images, use_features=False, reference_image=None):
         reference_image = torchvision.io.read_image(reference_image)
         MAP_POINT = calculate_map_points(reference_image.unsqueeze(0).to(DEVICE), reduction_model, use_features)[0]
 
+
+def evaluate_map(images, use_features=False, reference_image=None):
+    if reduction_model is None:
+        load_reduction_model(reference_image, use_features)
     points = calculate_map_points(images, reduction_model, use_features)
     # print(points, MAP_POINT)
     mean_distances = np.linalg.norm(points - MAP_POINT, axis=1).mean()  # calc euclidean distance between the two points
@@ -134,8 +145,8 @@ def evaluate_map(images, use_features=False, reference_image=None):
 def calculate_map_points(images, reduction_model, use_features):
     images = images.to(torch.uint8)
     if use_features:  # use clip features
-        features = perceptor.encode_image(
-            torch.nn.functional.interpolate(images, (224, 224), mode='nearest')).detach().cpu().numpy()
+        images = torch.nn.functional.interpolate(images, (224, 224), mode='nearest') / 255
+        features = perceptor.encode_image(nom(images)).detach().cpu().numpy()
     else:
         images = torch.nn.functional.interpolate(images, (128, 128), mode='nearest').int()
         features = images.detach().cpu().numpy().reshape(1, -1)
@@ -168,8 +179,9 @@ def evaluate(cond_vector_params, use_map_fitness=False, use_features=False, refe
     # convert_tensor = torchvision.transforms.ToTensor()
     into = torch.cat(p_s, 0)
 
-    into = nom(((into) + 1) / 2)
+    into = nom((into + 1) / 2)
     iii = perceptor.encode_image(into)  # 128 x 512
+    # print("iii", iii.shape)
 
     # llls = cond_vector_params()
     # lat_l = torch.abs(1 - torch.std(llls[0], dim=1)).mean() + torch.abs(torch.mean(llls[0])).mean() + 4 * torch.max(torch.square(llls[0]).mean(), lats.thrsh_lat)
@@ -187,6 +199,7 @@ def evaluate(cond_vector_params, use_map_fitness=False, use_features=False, refe
 
     # cls_l = ((50*torch.topk(llls[1],largest=False,dim=1,k=999)[0])**2).mean()
     cls_l = 0
+    # print("COMPARE", text_features, iii)
 
     cos_similarity = torch.cosine_similarity(text_features, iii, dim=-1).mean()
     return [lat_l, cls_l, -100 * cos_similarity, map_fitness]

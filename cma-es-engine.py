@@ -119,7 +119,8 @@ def main(verbose=True):
     experiment_name = f"{TEXT.replace(' ', '_')}_clip_cond_vector_{RANDOM_SEED or datetime.now().strftime('%Y-%m-%d_%H-%M')}"
     sub_folder = f"{experiment_name}_{N_GENS}_{POP_SIZE}_{SIGMA}_{LOCAL_SEARCH_STEPS}"
     np.random.seed(RANDOM_SEED)
-    model = big_sleep_cma_es.init(TEXT, cutn=NUM_CUTS, image_size=IMAGE_SIZE)
+    model = big_sleep_cma_es.init(TEXT, cutn=NUM_CUTS, image_size=IMAGE_SIZE, use_map_fitness=USE_MAP_FITNESS,
+                                  use_features=USE_FEATURES, reference_image=REFERENCE_IMAGE)
     NUM_LATENTS = len(model.config.layers) + 1
     save_folder, sub_folder = extra_tools.create_save_folder(save_folder, sub_folder)
     with open(os.path.join(save_folder, sub_folder, "params.json"), "w") as f:
@@ -177,6 +178,7 @@ def main(verbose=True):
 
         # Update the hall of fame and the statistics with the
         # currently evaluated population
+        halloffame.clear()
         halloffame.update(population)
         record = stats.compile(population)
         logbook.record(evals=len(population), gen=gen, **record)
