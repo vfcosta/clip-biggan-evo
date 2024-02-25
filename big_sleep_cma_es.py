@@ -118,8 +118,9 @@ def evaluate_map(images, use_features=False, reference_image=None):
     if reduction_model is None:
         logger.info("loading dim_reduction model")
         # with open("dim_reduction.pkl", "rb") as f:
-        #     reduction_model = pickle.load(f)
-        reduction_model = load_ParametricUMAP("../gen-tsne/model_parametric_umap")
+        with open("../gen-tsne/dim_reduction.pkl", "rb") as f:
+            reduction_model = pickle.load(f)
+        # reduction_model = load_ParametricUMAP("../gen-tsne/model_parametric_umap")
         reference_image = torchvision.io.read_image(reference_image)
         MAP_POINT = calculate_map_points(reference_image.unsqueeze(0).to(DEVICE), reduction_model, use_features)[0]
 
@@ -131,6 +132,7 @@ def evaluate_map(images, use_features=False, reference_image=None):
 
 
 def calculate_map_points(images, reduction_model, use_features):
+    images = images.to(torch.uint8)
     if use_features:  # use clip features
         features = perceptor.encode_image(
             torch.nn.functional.interpolate(images, (224, 224), mode='nearest')).detach().cpu().numpy()
